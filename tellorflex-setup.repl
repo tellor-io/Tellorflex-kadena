@@ -1,0 +1,58 @@
+;  Setup keysets and load contracts
+;  https://github.com/thomashoneyman/real-world-pact/tree/main/01-faucet-contract learned alot from this repo.
+
+(env-data { "namespace-keyset": { "keys": [ ], "pred": "keys-all" }, "test-keyset": { "keys": [ ], "pred": "keys-all" } })
+(begin-tx)
+(define-namespace "free" (read-keyset "test-keyset") (read-keyset "namespace-keyset"))
+(commit-tx)
+
+(env-data {})
+
+(begin-tx)
+(load "./root/fungible-v2.pact")
+(load "./root/fungible-xchain-v1.pact")
+(load "./root/coin-v5.pact")
+
+(create-table coin.coin-table)
+(create-table coin.allocation-table)
+(commit-tx)
+
+(env-data { "tellor-admin-keyset": { "keys": [ "tellor-keyset-public-key" ], "pred": "keys-all" }, "upgrade": false })
+(env-sigs [{"key": "tellor-keyset-public-key", "caps": []}])
+
+;  load tellorflex contract
+(begin-tx)
+(load "./tellorflex.pact")
+(commit-tx)
+;  clear environment metadata
+(env-sigs [])
+(env-data {})
+
+;  insert fake user keyset
+(env-data { "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" } })
+(env-sigs [{"key": "user-public-key", "caps": []}])
+;  create and define user keyset in free namespace
+(begin-tx)
+(namespace "free")
+(define-keyset "free.user-keyset" (read-keyset "user-keyset"))
+(commit-tx)
+(env-data {})
+
+(begin-tx)
+;  create accounts in coin for admin and user to recieve funds
+(coin.create-account "tellorflex" (describe-keyset "free.tellor-admin-keyset"))
+(coin.create-account "user" (describe-keyset "free.user-keyset"))
+
+;  fake capability(only available in testing) then mint tokens
+(test-capability (coin.COINBASE))
+(coin.coinbase "tellorflex" (describe-keyset "free.tellor-admin-keyset") 1000.0)
+(coin.coinbase "user" (describe-keyset "free.user-keyset") 1000.0)
+(commit-tx)
+
+(env-gasmodel "table")
+(env-gaslimit 170000)
+
+(print "----------")
+(print "'tellorflex' account created:\n  - keyset: 'tellor-admin-keyset'\n  - public key: 'tellor-keyset-public-key'\n  - balance: 1000.0 KDA")
+(print "'user' account created:\n  - keyset: 'user-keyset'\n  - public key: 'user-public-key'\n  - balance: 1000.0 KDA")
+(print "----------")
