@@ -29,7 +29,7 @@ pact
 A basic tellor implementation that is still a work in progress.  
 Functions included currently: 
 
-```c
+```cli
 - depositStake
 - submitValue
 - retrieveValue

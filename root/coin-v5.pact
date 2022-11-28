@@ -153,7 +153,7 @@
   (defconst COIN_CHARSET CHARSET_LATIN1
     "The default coin contract character set")
 
-  (defconst MINIMUM_PRECISION 12
+  (defconst MINIMUM_PRECISION 18
     "Minimum allowed precision for coin transactions")
 
   (defconst MINIMUM_ACCOUNT_LENGTH 3

@@ -29,24 +29,24 @@
 (env-data {})
 
 ;  insert fake user keyset
-(env-data { "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" } })
-(env-sigs [{"key": "user-public-key", "caps": []}])
+(env-data { "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" } })
+(env-sigs [{"key": "reporter1-public-key", "caps": []}])
 ;  create and define user keyset in free namespace
 (begin-tx)
 (namespace "free")
-(define-keyset "free.user-keyset" (read-keyset "user-keyset"))
+(define-keyset "free.reporter1-keyset" (read-keyset "reporter1-keyset"))
 (commit-tx)
 (env-data {})
 
 (begin-tx)
 ;  create accounts in coin for admin and user to recieve funds
 (coin.create-account "tellorflex" (describe-keyset "free.tellor-admin-keyset"))
-(coin.create-account "user" (describe-keyset "free.user-keyset"))
+(coin.create-account "reporter1" (describe-keyset "free.reporter1-keyset"))
 
 ;  fake capability(only available in testing) then mint tokens
 (test-capability (coin.COINBASE))
 (coin.coinbase "tellorflex" (describe-keyset "free.tellor-admin-keyset") 1000.0)
-(coin.coinbase "user" (describe-keyset "free.user-keyset") 1000.0)
+(coin.coinbase "reporter1" (describe-keyset "free.reporter1-keyset") 1000.0)
 (commit-tx)
 
 (env-gasmodel "table")
@@ -54,5 +54,5 @@
 
 (print "----------")
 (print "'tellorflex' account created:\n  - keyset: 'tellor-admin-keyset'\n  - public key: 'tellor-keyset-public-key'\n  - balance: 1000.0 KDA")
-(print "'user' account created:\n  - keyset: 'user-keyset'\n  - public key: 'user-public-key'\n  - balance: 1000.0 KDA")
+(print "'reporter1' account created:\n  - keyset: 'reporter1-keyset'\n  - public key: 'reporter1-public-key'\n  - balance: 1000.0 KDA")
 (print "----------")

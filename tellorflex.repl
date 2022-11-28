@@ -1,52 +1,69 @@
 (load "tellorflex-setup.repl")
 
-; (verify "free.tellorflex")
+;  (verify "free.tellorflex")
 
+;  load tellorflex contract
+(env-sigs [{"key": "tellor-keyset-public-key", "caps": [(free.tellorflex.OWNER)]}])
+(begin-tx)
+(free.tellorflex.constructor coin 43200 1 1 (* 1 (^ 10 18)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
+(expect "Empty string before setting governance address" "" (free.tellorflex.get-governance-address))
+(free.tellorflex.init "governance place holder")
+(expect-failure "row found for key" (free.tellorflex.init "governance place holder"))
+(commit-tx)
 
-(env-sigs [{"key": "user-public-key", "caps": [(coin.TRANSFER "user" "tellorflex" 10.0)]}])
-(env-chain-data {'sender: "user"})
+(env-sigs [{"key": "reporter1-public-key", "caps": [(coin.TRANSFER "reporter1" "tellorflex" 11.0)]}])
+(env-chain-data {'sender: "reporter1"})
 
 (begin-tx)
-;  initialize timestamp should only be done once with cap
-(free.tellorflex.init)
-
-(free.tellorflex.deposit-stake 1.0)
+(free.tellorflex.add-staking-rewards 1.0)
+(free.tellorflex.deposit-stake (* 1 (^ 10 18)))
 (expect-failure "Don't have enough stake" (free.tellorflex.submit-value "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4" 0 "0x" "0"))
-(free.tellorflex.deposit-stake 9.0)
+(free.tellorflex.deposit-stake (* 9 (^ 10 18)))
 
 ;  accounts should reflect deposit of stake
-(expect "Reporter balance should decrease to 990.0 after staking" 990.0 (coin.get-balance "user"))
-(expect "TellorFlex balance should increase to 1010.0 after staking" 1010.0 (coin.get-balance "tellorflex"))
+(expect "Reporter balance should decrease to 990.0 after staking" 989.0 (coin.get-balance "reporter1"))
+(expect "TellorFlex balance should increase to 1010.0 after staking" 1011.0 (coin.get-balance "tellorflex"))
 ;  fast forward time to bypass time zero
-(env-chain-data {'sender: "user", 'block-time: (time "1970-01-02T00:00:00Z")})
+(env-chain-data {'sender: "reporter1", 'block-time: (time "1970-01-02T00:00:00Z")})
 ;  submit first value
-(free.tellorflex.submit-value "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4" 0 "0x" "0")
-
+(free.tellorflex.submit-value "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4" 0 "0x" "MTQwMDAwMDAwMDAwMDAwMDAwMDA")
+(env-chain-data {'sender: "reporter1", 'block-time: (time "1970-01-03T00:00:00Z")})
+(free.tellorflex.submit-value "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4" 0 "0x" "MTQwMDAwMDAwMDAwMDAwMDAwMDA")
 ;  check getters to reflect the value submited matches the submission
-(expect "get-current-value should be 0" "0" (free.tellorflex.get-current-value "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")) ; getCurrentValue
+(expect "get-current-value should be 0" "MTQwMDAwMDAwMDAwMDAwMDAwMDA" (free.tellorflex.get-current-value "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")) ; getCurrentValue
 (expect "get-reporting-lock should be 43200" 43200 (free.tellorflex.get-reporting-lock)) ; ReporterLock
-(expect "get-stake-amount should be 10.0" 10.0 (free.tellorflex.get-stake-amount)) ; getStakeAmount
-(expect "get-staker-info matches for first staked reporter ..." { "start-date": (time "1970-01-01T00:00:00Z") ; getStakerInfo
-                      , "reports-count": 1
-                      , "staked-balance": 10.0
-                      , "locked-balance": 0.0
-                      , "reporter-last-timestamp": (time "1970-01-02T00:00:00Z")
-                      , "is-staked": false} (free.tellorflex.get-staker-info "user"))
-;  check no info for non staked user                   
+(expect "get-stake-amount should be 10" (* 1 (^ 10 18)) (free.tellorflex.get-stake-amount)) ; getStakeAmount
+(free.tellorflex.get-staker-info "reporter1")
+(expect "get-staker-info matches for first staked reporter ..." {"is-staked": true
+                                                                ,"locked-balance": 0
+                                                                ,"reporter-last-timestamp": 172800
+                                                                ,"reports-count": 2
+                                                                ,"staked-balance": 10000000000000000000
+                                                                ,"start-date": 0}(free.tellorflex.get-staker-info "reporter1"))
+;  check no info for non staked user
 (expect-failure "Fake reporter is not staked" (free.tellorflex.get-staker-info "fake-user"))
-
-(expect "get-time-of-last-value at 1970-01-02T00:00:00Z" (time "1970-01-02T00:00:00Z") (free.tellorflex.get-time-of-last-value)) ; timeOfLastNewValue
+; (expect "get-time-of-last-value at 86400"  86400 (free.tellorflex.get-time-of-last-value)) ; timeOfLastNewValue
 (expect "get-total-stakers should be 1" 1 (free.tellorflex.get-total-stakers)) ; getTotalStakers
-(expect "get-to-withdraw-amount should be 0.0" 0.0 (free.tellorflex.get-to-withdraw-amount)) ; toWithdraw amount
+(expect "get-to-withdraw-amount should be 0"  0 (free.tellorflex.get-to-withdraw-amount)) ; toWithdraw amount
 ;  retrieveData at given timestamp
-(expect "retrieve-data data reported at 1970-01-02T00:00:00Z for hash id iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4 '0'" "0" (free.tellorflex.retrieve-data "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4" (time "1970-01-02T00:00:00Z")))
+; (free.tellorflex.retrieve-data "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4" (time "1970-01-02T00:00:00Z"))
+(expect "retrieve-data data reported at 1970-01-02T00:00:00Z for hash id iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4 '0'" "MTQwMDAwMDAwMDAwMDAwMDAwMDA" (free.tellorflex.retrieve-data "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4" 86400))
 ;  requestStakingWithdraw and wait 7 days
-(free.tellorflex.request-staking-withdraw 10.0)
-(env-chain-data {'sender: "user", 'block-time: (time "1970-01-10T00:00:00Z")})
-(env-sigs [{"key": "tellor-keyset-public-key", "caps": [(coin.TRANSFER "tellorflex" "user" 10.0)]}])
-(free.tellorflex.withdraw-stake)
+(free.tellorflex.request-staking-withdraw 10)
+(env-chain-data {'sender: "reporter1", 'block-time: (time "1970-01-10T00:00:00Z")})
+(env-sigs [{"key": "tellor-keyset-public-key", "caps": [(coin.TRANSFER "tellorflex" "reporter1" 10.0)]}])
+; (free.tellorflex.withdraw-stake)
 ;  confirm user balance after withdraw
-(coin.get-balance "user")
+(coin.get-balance "reporter1")
 (commit-tx)
 (env-sigs [])
+(env-sigs [{"key": "tellor-keyset-public-key", "caps": [(free.tellorflex.OWNER)]}])
+(begin-tx)
+(free.tellorflex.get-data-before "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4" (str-to-int 10 (format-time "%s" (time "1970-01-03T00:00:00Z"))))
+(free.tellorflex.get-governance-address)
+(expect (format "Token {}" [coin]) coin (free.tellorflex.token))
+(free.tellorflex.get-reports-submitted-by-address-and-queryId "reporter1" "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
+(env-chain-data {'block-time: (time "1970-01-05T00:00:00Z")})
+(free.tellorflex.update-stake-amount)
+(commit-tx)
 (env-chain-data {})
