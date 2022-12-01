@@ -23,6 +23,22 @@
 ;  load tellorflex contract
 (begin-tx)
 (load "./tellorflex.pact")
+(load "./governance.pact")
+
+(create-table tellorflex.stake-info)
+(create-table tellorflex.reports-table)
+(create-table tellorflex.timestamp-table)
+(create-table tellorflex.global-table)
+; governance
+(create-table governance.dispute-info)
+(create-table governance.tally)
+(create-table governance.vote-info)
+(create-table governance.vote-rounds)
+(create-table governance.open-disputes-on-id)
+(create-table governance.global)
+(init-global)
+
+(constructor coin 43200 1 1 (* 1 (^ 10 18)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
 (commit-tx)
 ;  clear environment metadata
 (env-sigs [])
@@ -40,17 +56,17 @@
 
 (begin-tx)
 ;  create accounts in coin for admin and user to recieve funds
-(coin.create-account "tellorflex" (describe-keyset "free.tellor-admin-keyset"))
+(coin.create-account "tellorflex" (free.tellorflex.module-assets))
 (coin.create-account "reporter1" (describe-keyset "free.reporter1-keyset"))
 
 ;  fake capability(only available in testing) then mint tokens
 (test-capability (coin.COINBASE))
-(coin.coinbase "tellorflex" (describe-keyset "free.tellor-admin-keyset") 1000.0)
+(coin.coinbase "tellorflex" (free.tellorflex.module-assets) 1000.0)
 (coin.coinbase "reporter1" (describe-keyset "free.reporter1-keyset") 1000.0)
 (commit-tx)
 
 (env-gasmodel "table")
-(env-gaslimit 170000)
+(env-gaslimit 150000)
 
 (print "----------")
 (print "'tellorflex' account created:\n  - keyset: 'tellor-admin-keyset'\n  - public key: 'tellor-keyset-public-key'\n  - balance: 1000.0 KDA")

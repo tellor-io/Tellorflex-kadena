@@ -66,7 +66,7 @@
     dispute-ids:[integer])
 
   (deftable dispute-info:{dispute-schema})
-  (deftable tally:{tally-shcema})
+  (deftable tally:{tally-schema})
   (deftable vote-info:{vote-schema})
   (deftable vote-rounds:{vote-rounds-schema})
   (deftable open-disputes-on-id:{open-disputes-on-id-schema})
@@ -124,7 +124,7 @@
 
           (if (= vote-rounds 1)
             (begin-dispute-pact dispute-id query-id timestamp)
-            (else-begin-dispute-pact block-time dispute-id dispute-fee dispute-ids)
+            (else-begin-dispute-pact block-time dispute-id dispute-fee (at 'dispute-ids (read vote-rounds hash)))
             )
         (with-read global 'global-vars { 'vote-count := vote-count }
           (update global 'global-vars { 'vote-count: (+ vote-count 1)}))
@@ -143,7 +143,7 @@
       (enforce (not (executed)) "Vote has already been executed")
       (enforce (> tally-date 0) "Vote must be tallied")
       (with-read vote-rounds hash { 'dispute-ids := dispute-ids }
-        (enforce (= (length disputed-ids vote-round)) "Must be the final vote")
+        (enforce (= (length dispute-ids vote-round)) "Must be the final vote")
         (enforce (>= (- (tellorflex.block-time-in-seconds) tally-date) (days 1)) "1 day has to pass after tally to allow for disputes"))
       (update vote-info dispute-id { 'executed: true })
 
@@ -235,7 +235,7 @@
     (step
       (require-capability (PRIVATE))
       (update dispute-info dispute-id
-      { 'slashed-amount: (tellorflex.slash-reporter disputed-reporter 'governance)
+      { 'slashed-amount: (tellorflex.slash-reporter (at 'disputed-reporter (read dispute-info dispute-id)) 'governance)
       , 'value: (tellorflex.retrieve-data query-id timestamp)}))
 
     (step
@@ -273,7 +273,7 @@
   ; *                                                                           *
   ; *****************************************************************************
   (defun get-dispute-fee ()
-    (/ (tellorflex.get-stake-amount) 10)
+    (/ (free.tellorflex.get-stake-amount) 10)
   )
 )
 ; *****************************************************************************
@@ -281,13 +281,13 @@
 ; *                         Initialize                                        *
 ; *                                                                           *
 ; *****************************************************************************
-(if (read-msg "upgrade")
-  [
-  (create-table dispute-info)
-  (create-table tally)
-  (create-table vote-info)
-  (create-table vote-rounds)
-  (create-table open-disputes-on-id)
-  (create-table global)
-  (init-global)
-  ])
+; (if (read-msg "upgrade")
+;   [
+;   (create-table dispute-info)
+;   (create-table tally)
+;   (create-table vote-info)
+;   (create-table vote-rounds)
+;   (create-table open-disputes-on-id)
+;   (create-table global)
+;   ; (init-global)
+;   ])
