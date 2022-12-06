@@ -11,6 +11,7 @@
 )
 (module tellorflex TELLOR
 
+
   @doc
     "'tellorflex' represents the tellor oracle contract. This contract         \
     \allows reporters to stake and report values to make available on chain    \
@@ -21,6 +22,7 @@
   @model
     [ (defproperty owner-authorized (authorized-by "free.tellor-admin-keyset"))
     ]
+    (implements i-flex)
 ; *****************************************************************************
 ; *                                                                           *
 ; *                          Constants                                        *
@@ -37,36 +39,8 @@
 ; *                          Schema                                           *
 ; *                                                                           *
 ; *****************************************************************************
-  (defschema reporter-schema
-
-    start-date:integer
-    reports-count:integer
-    staked-balance:integer
-    locked-balance:integer
-    reporter-last-timestamp:integer
-    reports-submitted:integer
-    start-vote-count:integer
-    start-vote-tally:integer
-    is-staked:bool)
-
-  (defschema reports-schema
-
-      index:integer
-      query-id:string
-      timestamp:integer
-      block-height:integer
-      value:string
-      reporter:string
-      is-disputed:bool)
-
-  (defschema timestamps-schema
-
-    timestamps:[integer])
-
   (defschema constructor-schema
-
     token:module{fungible-v2}
-    governance:string
     accumulated-reward-per-share:integer
     minimum-stake-amount:integer
     reporting-lock:integer
@@ -80,20 +54,50 @@
     time-of-last-new-value:integer
     total-reward-debt:integer
     total-stake-amount:integer
+    total-stakers:integer
     to-withdraw:integer)
-
+  (defschema report
+    index:integer
+    query-id:string
+    timestamp:integer
+    block-height:integer
+    value:string
+    reporter:string
+    is-disputed:bool)
+  (defschema stake-info
+    start-date:integer
+    staked-balance:integer
+    locked-balance:integer
+    reward-debt:integer
+    reporter-last-timestamp:integer
+    reports-submitted:integer
+    start-vote-count:integer
+    start-vote-tally:integer
+    is-staked:bool
+    guard:guard)
+  (defschema reports-submitted-by-queryid
+    reports-submitted-by-queryid:integer)
+  (defschema timestamp-dispute
+    timestamp:integer
+    disputed:bool)
+  (defschema timestamps-schema
+    timestamps:[object{timestamp-dispute}])
+  (defschema governance-schema
+    governance:module{tellor-governance})
+  (defschema gov-guard-schema
+    guard:guard)
 ; *****************************************************************************
 ; *                                                                           *
 ; *                          Tables                                           *
 ; *                                                                           *
 ; *****************************************************************************
-  (deftable stake-info:{reporter-schema})
-
-  (deftable reports-table:{reports-schema})
-
+  (deftable staker-details:{stake-info})
+  (deftable reports-submitted-count:{reports-submitted-by-queryid})
+  (deftable reports:{report})
   (deftable timestamp-table:{timestamps-schema})
-
   (deftable global-table:{constructor-schema})
+  (deftable governance-table:{governance-schema})
+  (deftable gov-guard:{gov-guard-schema})
 
 ; *****************************************************************************
 ; *                                                                           *
@@ -102,7 +106,6 @@
 ; *****************************************************************************
   (defcap TELLOR ()
     @doc "Enforce only owner."
-    ; (enforce false "no upgrades")
     (enforce-guard (keyset-ref-guard "free.tellor-admin-keyset"))
   )
 
@@ -110,8 +113,25 @@
     true
   )
 
-  (defun module-assets ()
-    (create-module-guard "module-owned-assets")
+  (defcap STAKER (account-name:string)
+    (enforce-keyset (read-keyset account-name))
+    (enforce-guard (at 'guard (read staker-details account-name)))
+  )
+
+  (defcap GOV ()
+    (enforce-guard (at 'guard (read gov-guard 'gov-guard)))
+  )
+; *****************************************************************************
+; *                                                                           *
+; *                          Guard                                            *
+; *                                                                           *
+; *****************************************************************************
+  (defun capping ()
+    (require-capability (PRIVATE))
+  )
+
+  (defun create-guard ()
+    (create-user-guard (capping))
   )
 ; *****************************************************************************
 ; *                                                                           *
@@ -130,218 +150,213 @@
 
     (with-capability (TELLOR)
       (let ((potential-amount (/ stake-amount-dollar-target staking-token-price)))
-      (insert global-table 'global-vars
-        { 'token: token
-        , 'governance: ""
-        , 'accumulated-reward-per-share: 0
-        , 'minimum-stake-amount: minimum-stake-amount
-        , 'reporting-lock: reporting-lock
-        , 'reward-rate: 0
-        , 'stake-amount: (if (<  potential-amount minimum-stake-amount) minimum-stake-amount potential-amount)
-        , 'stake-amount-dollar-target: stake-amount-dollar-target
-        , 'staking-rewards-balance: 0
-        , 'staking-token-price-query-id: staking-token-price-query-id
-        , 'time-based-reward: (* 5 (^ 10 17))
-        , 'time-of-last-allocation: 0
-        , 'time-of-last-new-value: (block-time-in-seconds)
-        , 'total-reward-debt: 0
-        , 'total-stake-amount: 0
-        , 'to-withdraw: 0})))
-  )
-
-  (defun init (governance-address:string)
-    @doc "Allows the owner to initialize the governance (flex addy needed for governance deployment)"
-    (with-capability (TELLOR)
-      (enforce (!= governance-address "") "Parameter can't be empty string")
-      (let ((governance-addy (at 'governance (read global-table 'global-vars))))
-      (enforce (= governance-addy "") "Governance address already set!")
-      (update global-table 'global-vars { 'governance: governance-address })))
-  )
-
-  (defun add-staking-rewards (amount:decimal)
-    @doc "Funds the flex contract with staking rewards (autopay and miniting)"
-
-      ( with-read global-table 'global-vars
-        { 'token := token:module{fungible-v2}
-        , 'staking-rewards-balance := staking-rewards-balance
-        , 'accumulated-reward-per-share := accumulated-reward-per-share
-        , 'total-stake-amount := total-stake-amount
-        , 'total-reward-debt := total-reward-debt }
-        (token::transfer (msg-sender) TELLOR_FLEX_ACCOUNT amount)
-
-        (with-capability (PRIVATE)
-          (update-rewards)
-          )
-
-        (let* ((sub-reward-rate (- (* 1 PRECISION) total-reward-debt))
-               (per-share (* accumulated-reward-per-share total-stake-amount))
-               (reward-rate (- staking-rewards-balance (/ per-share sub-reward-rate))))
-        (update global-table 'global-vars
-          { 'staking-rewards-balance: (use-precision amount)
-          , 'reward-rate: (/ reward-rate (round (days 30)))
-          })
+        (insert global-table 'global-vars
+          { 'token: token
+          , 'accumulated-reward-per-share: 0
+          , 'minimum-stake-amount: minimum-stake-amount
+          , 'reporting-lock: reporting-lock
+          , 'reward-rate: 0
+          , 'stake-amount: (if (<  potential-amount minimum-stake-amount) minimum-stake-amount potential-amount)
+          , 'stake-amount-dollar-target: stake-amount-dollar-target
+          , 'staking-rewards-balance: 0
+          , 'staking-token-price-query-id: staking-token-price-query-id
+          , 'time-based-reward: (* 5 (^ 10 17))
+          , 'time-of-last-allocation: 0
+          , 'time-of-last-new-value: (block-time-in-seconds)
+          , 'total-reward-debt: 0
+          , 'total-stake-amount: 0
+          , 'total-stakers: 0
+          , 'to-withdraw: 0}
+        )
       )
     )
   )
 
-  (defun add-staker (staker:string)
+  (defun init-gov-guard:string (guard:guard)
+    ; fails if governance hasn't been initialized
+    (get-governance-module)
+    (enforce-keyset "free.tellor-admin-keyset")
+    (insert gov-guard 'gov-guard {'guard: guard})
+  )
+
+  (defun init (governance:module{tellor-governance})
+    @doc "Allows the owner to initialize the governance (flex addy needed for governance deployment)"
+    (with-capability (TELLOR)
+      (insert governance-table 'governance { 'governance: governance }))
+  )
+
+  (defun add-staking-rewards (account:string amount:decimal)
+    @doc "Funds the flex contract with staking rewards (autopay and miniting) anyone can add at will"
+
+    (let ((token:module{fungible-v2} (token)))
+      (token::transfer-create account TELLOR_FLEX_ACCOUNT (create-guard) amount)
+
+      (with-capability (PRIVATE)
+        (update-rewards) )
+
+      (update global-table 'global-vars
+        { 'staking-rewards-balance: (use-precision amount)
+        , 'reward-rate: (/ (calculate-reward-rate) (round (days 30)))
+        })
+    )
+  )
+
+  (defun add-staker (staker:string guard:guard)
     (require-capability (PRIVATE))
-    (with-default-read stake-info staker
+    (with-default-read staker-details staker
       { 'start-date: 0
-      , 'reports-count: 0
       , 'staked-balance: 0
       , 'locked-balance: 0
+      , 'reward-debt: 0
       , 'reporter-last-timestamp: 0
       , 'reports-submitted: 0
       , 'start-vote-count: 0
       , 'start-vote-tally: 0
       , 'is-staked: false
+      , 'guard: guard
       }
       { 'staked-balance := staked-balance
       , 'locked-balance := locked-balance
-      , 'reports-count:= reports-count
+      , 'reward-debt := reward-debt
       , 'reporter-last-timestamp := reporter-last-timestamp
       , 'reports-submitted:=reports-submitted
       , 'start-vote-count:=start-vote-count
       , 'start-vote-tally:=start-vote-tally
       , 'start-date := start-date
       , 'is-staked := is-staked
+      , 'guard := guarded
       }
-      (write stake-info staker
+      (write staker-details staker
         { 'staked-balance: staked-balance
         , 'locked-balance: locked-balance
-        , 'reports-count: reports-count
+        , 'reward-debt: reward-debt
         , 'reporter-last-timestamp: reporter-last-timestamp
         , 'reports-submitted: reports-submitted
         , 'start-vote-count: start-vote-count
         , 'start-vote-tally: start-vote-tally
         , 'start-date: start-date
         , 'is-staked: is-staked
+        , 'guard: guarded
         }))
   )
 
-  (defun deposit-stake (amount:integer)
+  (defun deposit-stake (staker:string guard:guard amount:integer)
     @doc "Allows a reporter to submit stake"
     (enforce (> amount 0) "Amount must be greater than 0")
 
-    (let ((governance (get-governance-address))
-          (staker (msg-sender))
-          (block-time (block-time-in-seconds))
-          (token:module{fungible-v2} (token)))
+      (let ((governance:module{tellor-governance}(try "governance not set" (get-governance-module)))
+            (block-time (block-time-in-seconds))
+            (token:module{fungible-v2} (token)))
 
-     (enforce (!= governance "") "Governance address hasn't been set!")
-
-     (with-capability (PRIVATE)
-        (add-staker staker)
-      )
-
-     (with-read stake-info staker { 'locked-balance := locked-balance , 'staked-balance := staked-balance }
+      (with-capability (PRIVATE)
+        (add-staker staker guard))
+    (with-capability (STAKER staker) ;TODO: consolidate
+     (with-read staker-details staker
+       { 'locked-balance := locked-balance , 'staked-balance := staked-balance }
        (if (> locked-balance 0)
           (if (>= locked-balance amount)
             [
-            (update stake-info staker { 'locked-balance: (- locked-balance amount)})
-            (update global-table 'global-vars { 'to-withdraw: (- (get-to-withdraw-amount) amount)})
+            (update staker-details staker
+              { 'locked-balance: (- locked-balance amount)})
+            (update global-table 'global-vars
+              { 'to-withdraw: (- (get-to-withdraw-amount) amount)})
             ]
             [
             (token::transfer staker TELLOR_FLEX_ACCOUNT (- amount locked-balance))
-            (update global-table 'global-vars { 'to-withdraw: (- (get-to-withdraw-amount) locked-balance) })
-            (write stake-info staker { 'locked-balance: 0})
+            (update global-table 'global-vars
+             { 'to-withdraw: (- (get-to-withdraw-amount) locked-balance) })
+            (update staker-details staker { 'locked-balance: 0 })
             ])
-            ; TODO: uncomment after completing governance contract
-          ; (if ( = staked-balance 0)
-              [
-                (update stake-info staker
 
-                  {
-                  ; 'start-vote-count: (governance.get-vote-count)
-                  ; , 'start-vote-tally: (governance.get-vote-tally-by-address account)
-                  ; Remove this once update-stake-and-pay-rewards function is added
-                  ; this change will fail tests
-                  'staked-balance: (+ amount staked-balance)
-                  })
-                (token::transfer staker TELLOR_FLEX_ACCOUNT (/ (/ (- amount locked-balance)(^ 10  18)) 1.0))
-
-              ]
-              ; "No else just ifs"
+          [(if ( = staked-balance 0)
+              (update staker-details staker
+                { 'start-vote-count: (governance::get-vote-count)
+                , 'start-vote-tally: (governance::get-vote-tally-by-address staker)
+                , 'staked-balance: (+ amount staked-balance)})
+              "No else just ifs"
             )
+            (token::transfer staker TELLOR_FLEX_ACCOUNT (/ (/ (- amount locked-balance)(^ 10  18)) 1.0))
+            ]
           )
-        ; )
+        )
 ;  change token
-      ; (update-stake-and-pay-rewards account (+ staked-balance amount))
-      (update stake-info staker
-        { 'start-date: block-time
-        ; remove this once update-stake-and-pay-rewards function is added
-        , 'is-staked: true
-        })
+      (with-capability (PRIVATE)
+        (update-stake-and-pay-rewards staker (+ (at 'staked-balance (read staker-details staker)) amount)))
+      (update staker-details staker { 'start-date: block-time })
       )
-
+    )
   )
 
   (defun remove-value (query-id:string timestamp:integer)
     @doc "Remove disputed value only by governance"
-    (enforce (= (msg-sender) (at 'governance (read global-table 'global-vars))) "Caller must be governance address")
-    (enforce (not (is-in-dispute query-id timestamp)) "Value already disputed")
-    (update reports-table (concatenate query-id timestamp)
-      { 'value: "" , 'is-disputed: true })
+    (with-capability (GOV)
+      (enforce (not (is-in-dispute query-id timestamp)) "Value already disputed")
+      (update reports (concatenate query-id timestamp)
+        { 'value: "" , 'is-disputed: true })
+    )
   )
 
-  (defun request-staking-withdraw (amount:integer)
+  (defun request-staking-withdraw (staker:string amount:integer)
     @doc "Allows a reporter to request to withdraw their stake"
-    (let ( (sender (msg-sender) )
-           (block-time (block-time-in-seconds))
+    (let ( (block-time (block-time-in-seconds))
+           (guard (at 'guard (read staker-details staker)))
            (to-withdraw (at 'to-withdraw (read global-table 'global-vars)))
            )
-         (with-read stake-info sender
+        (with-capability (STAKER staker)
+         (with-read staker-details staker
            { "staked-balance" := staked-balance
            , "locked-balance" := locked-balance
            , "start-date" := start-date
            }
            (enforce (>= staked-balance amount) "Insufficient staked balance")
            ; TODO: governance contract
-           ; (update-stake-and-pay-rewards account (- staked-balance amount))
-           (update stake-info sender
+           (with-capability (PRIVATE)
+             (update-stake-and-pay-rewards staker (- staked-balance amount)))
+           (update staker-details staker
              { "locked-balance": (+ locked-balance amount)
              , "start-date": block-time})
            )
            (update global-table 'global-vars
             { 'to-withdraw: (+ to-withdraw amount)})
-
+      )
     )
   )
 
   (defun slash-reporter (reporter:string recipient:string)
-    (let ((governance (at 'governance (read global-table 'global-vars))))
-      (enforce (= (msg-sender) governance) "Only governance can slash reporter"))
-    (with-read stake-info reporter
-      { 'staked-balance := staked-balance ,'locked-balance := locked-balance }
-      (enforce (> (+ staked-balance locked-balance) 0) "Zero staker balance")
-      (let* ((stake-amount (at 'stake-amount (read global-table 'global-vars)))
-             (to-withdraw (at 'to-withdraw (read global-table 'global-vars)))
-             (slash-amount
-               (if (or (>= locked-balance stake-amount) (>= (+ locked-balance staked-balance) stake-amount))
-               stake-amount
-               (+ staked-balance locked-balance))))
-       ; (if (>= locked-balance stake-amount)
-       ;     (update-stake-and-pay-rewards reporter (- staked-balance (- stake-amount staked-balance)))
-       ;     (update-stake-and-pay-rewards reporter 0))
-      (if (>= locked-balance stake-amount)
-          [
+    (with-capability (GOV)
+      (with-read staker-details reporter
+        { 'staked-balance := staked-balance ,'locked-balance := locked-balance }
+        (enforce (> (+ staked-balance locked-balance) 0) "Zero staker balance")
+        (let* ((token:module{fungible-v2} (token))
+               (stake-amount (at 'stake-amount (read global-table 'global-vars)))
+               (to-withdraw (at 'to-withdraw (read global-table 'global-vars))))
+
+        (if (>= locked-balance stake-amount)
+            [
+            (update staker-details reporter
+              {'locked-balance: (- locked-balance stake-amount)})
             (update global-table 'global-vars
               {'to-withdraw: (- to-withdraw stake-amount)})
-
-              (update stake-info reporter
-                {'locked-balance: (- locked-balance stake-amount)})
+            (token::transfer TELLOR_FLEX_ACCOUNT recipient (/ (/ stake-amount 1.0) (^ 10  18)))
             ]
-          [
-            (update global-table 'global-vars
-              {'to-withdraw: (- to-withdraw locked-balance)})
-            (update stake-info reporter
-              {'locked-balance: 0})
-            ]
+            (if (>= (+ locked-balance staked-balance) stake-amount)
+              [
+                (update-stake-and-pay-rewards reporter (- staked-balance (- stake-amount staked-balance)))
+                (update global-table 'global-vars
+                  { 'to-withdraw: (- to-withdraw locked-balance) })
+                (update staker-details reporter { 'locked-balance: 0 })
+                (token::transfer TELLOR_FLEX_ACCOUNT recipient (/ (/ stake-amount 1.0) (^ 10  18)))
+              ]
+              [
+              (update-stake-and-pay-rewards reporter 0)
+              (update global-table 'global-vars
+                { 'to-withdraw: (- to-withdraw locked-balance) })
+              (update staker-details reporter { 'locked-balance: 0 })
+              (token::transfer TELLOR_FLEX_ACCOUNT recipient (/ (/ (+ staked-balance locked-balance) 1.0) (^ 10  18)))
+              ]
+            )
           )
-
-        ; TODO:
-      ; (coin.transfer TELLOR_FLEX_ACCOUNT recipient (/ (/ slash-amount 1.0) (^ 10  18)))
+        )
       )
     )
   )
@@ -351,25 +366,27 @@
       nonce:integer
       query-data:string
       value:string
+      staker:string
     )
     @doc "Enables staked reporters to submit values into the oracle"
     (enforce (= query-id (hash query-data)) "Query id not hash of query data")
     (enforce (>= nonce 0) "Nonce too low")
     (enforce (!= value "") "Value empty!")
     (let ((block-time (block-time-in-seconds))
-          (msg-sender (msg-sender))
           (stake-amount (get-stake-amount))
-          (block-height (block-height)))
+          (block-height (block-height))
+          (guard (at 'guard (read staker-details staker))))
+        (with-capability (STAKER staker)
 
           (with-default-read timestamp-table query-id
             { 'timestamps: [] }
             { 'timestamps := timestamps }
             (enforce (or (= nonce (length timestamps)) (= nonce 0)) "Nonce must match timestamps list length")
 
-           (with-read stake-info msg-sender
+           (with-read staker-details staker
              { 'staked-balance := staked-balance
              , 'reporter-last-timestamp := reporter-last-timestamp
-             , 'reports-count := reports-count }
+             , 'reports-submitted := reports-submitted }
 
              (enforce (>= staked-balance stake-amount) "Don't have enough stake")
 
@@ -377,28 +394,36 @@
                (- block-time reporter-last-timestamp)(/ 43200 (/ staked-balance stake-amount)))
                "Still in reporter time lock")
 
-             (insert reports-table (concatenate query-id block-time)
+             (insert reports (concatenate query-id block-time)
                { 'index: (- (length timestamps) 1)
                , 'query-id: query-id
                , 'timestamp: (block-time-in-seconds)
                , 'block-height: 0
                , 'value: value
-               , 'reporter: msg-sender
+               , 'reporter: staker
                , 'is-disputed: false
                })
 
              (write timestamp-table query-id
-               { 'timestamps: (+ timestamps [block-time])})
+               { 'timestamps: (+ timestamps [{'timestamp: block-time, 'disputed: false}])})
 
 
-            (update stake-info msg-sender
-              { 'reports-count: (+ reports-count 1)
+            (update staker-details staker
+              { 'reports-submitted: (+ reports-submitted 1)
               , 'reporter-last-timestamp: block-time})
+
+            (with-default-read reports-submitted-count (+ query-id staker)
+              { 'reports-submitted-by-queryid: 0}
+              { 'reports-submitted-by-queryid := reports-submitted-by-queryid }
+              (write reports-submitted-count (+ query-id staker)
+                { 'reports-submitted-by-queryid: (+ reports-submitted-by-queryid 1)})
+            )
 
         )
         (update global-table 'global-vars
           { 'time-of-last-new-value: block-time})
         )
+      )
     )
   )
 
@@ -418,26 +443,28 @@
     )
   )
 
-  (defun withdraw-stake ()
+  (defun withdraw-stake (staker:string)
     @doc "Withdraws a reporter's stake after the lock period expires"
-    (let ( (sender (msg-sender) )
+    (let ( (token:module{fungible-v2} (token))
            (block-time (block-time-in-seconds))
            (to-withdraw (at 'to-withdraw (read global-table 'global-vars)))
            )
-         (with-read stake-info sender
+         (with-capability (STAKER staker)
+         (with-read staker-details staker
            { "start-date" := start-date
            , "locked-balance" := locked-balance }
            (enforce (> (- block-time start-date) (round (days 7))) "7 days didn't pass")
            (enforce (> locked-balance 0) "Reporter not locked for withdrawal")
+           (with-capability (PRIVATE)
+           (token::transfer TELLOR_FLEX_ACCOUNT staker 10.0))
 
-           (coin.transfer TELLOR_FLEX_ACCOUNT sender (/ (/ locked-balance 1.0) (^ 10  18)))
-
-           (update stake-info sender
+           (update staker-details staker
              { "locked-balance": 0 })
 
            (update global-table 'global-vars
             { 'to-withdraw: (- to-withdraw locked-balance )})
       )
+     )
      )
     )
 ; *****************************************************************************
@@ -445,22 +472,26 @@
 ; *                          Getter functions                                 *
 ; *                                                                           *
 ; *****************************************************************************
+  (defun accumulated-reward-per-share ()
+    (at 'accumulated-reward-per-share (read global-table 'global-vars))
+  )
+
   (defun get-block-number-by-timestamp (query-id:string timestamp:integer)
     @doc "Returns the block number at a given timestamp"
-    (at 'block-height (read reports-table (concatenate query-id timestamp)))
+    (at 'block-height (read reports (concatenate query-id timestamp)))
   )
 
   (defun get-current-value:string (query-id:string)
     @doc "Get last reported value for query id"
     (let ((timestamp (at 0 (take (- 1) (at 'timestamps (read timestamp-table query-id))))))
-      (at 'value (read reports-table (concatenate query-id timestamp)))
+      (at 'value (read reports (concatenate query-id (at 'timestamp timestamp))))
     )
   )
 
   (defun get-data-before (query-id:string timestamp:integer)
     @doc "Retrieves the latest value for the queryId before the specified timestamp"
      (at 0
-       (select reports-table ['timestamp, 'value]
+       (select reports ['timestamp, 'value]
         (and?
           (where 'query-id (= query-id))
           (and?
@@ -468,19 +499,19 @@
             (where 'is-disputed (= false))))))
   )
 
-  (defun get-governance-address:string ()
-    @doc "Get governance address"
-    (at 'governance (read global-table 'global-vars))
+  (defun get-governance-module ()
+    @doc "Get governance module"
+    (at 'governance (read governance-table 'governance))
   )
 
-  (defun get-minimum-stake-amount:decimal ()
+  (defun minimum-stake-amount:decimal ()
     @doc "Get stake amount"
     (at 'minimum-stake-amount(read global-table 'global-vars))
   )
 
   (defun get-new-value-countby-query-id:integer (query-id:string)
     @doc "Get the number of values submitted for a query id"
-    (let ((timestamps (at 'timestamps (read timestamp-table query-id))))
+    (let ((timestamps (at 'timestamp (at 'timestamps (read timestamp-table query-id)))))
     (- (length timestamps) 1))
   )
 
@@ -507,16 +538,16 @@
 
   (defun get-report-details (query-id:string timestamp:integer)
     { 'reporter: (get-reporter-by-timestamp)
-    , 'disputed: (at 'is-disputed (read reports-table (concatenate query-id timestamp)))
+    , 'disputed: (at 'is-disputed (read reports (concatenate query-id timestamp)))
     }
   )
 
   (defun get-reporter-last-timestamp (reporter:string)
-    (at 'reporter-last-timestamp (read stake-info reporter))
+    (at 'reporter-last-timestamp (read staker-details reporter))
   )
 
   (defun get-reporter-by-timestamp (query-id:string timestamp:integer)
-    (at 'reporter (read reports-table (concatenate query-id timestamp)))
+    (at 'reporter (read reports (concatenate query-id timestamp)))
   )
 
   (defun get-reporting-lock:integer ()
@@ -525,15 +556,11 @@
   )
 
   (defun get-reports-submitted-by-address (reporter:string)
-    (at 'reports-count (read stake-info reporter))
+    (at 'reports-submitted (read staker-details reporter))
   )
 
   (defun get-reports-submitted-by-address-and-queryId:integer (reporter:string query-id:string)
-    (+ (at 'index (at 0
-      (select reports-table ['index]
-        (and?
-          (where 'query-id (= query-id))
-          (where 'reporter (= reporter)))))) 1)
+    (at 'reports-submitted-by-queryid (read reports-submitted-count (+ query-id reporter)))
   )
 
   (defun get-stake-amount:integer ()
@@ -543,7 +570,7 @@
 
   (defun get-staker-info:object (reporter:string)
     @doc "Get staker info details"
-    (read stake-info reporter)
+    (read staker-details reporter)
   )
 
   (defun get-time-of-last-new-value:integer ()
@@ -553,12 +580,22 @@
 
   (defun get-timestampby-query-id-and-index:integer (query-id:string index:integer)
     @doc "Gets the timestamp for the value based on their index"
-    (at index (at 'timestamps (read timestamp-table query-id)))
+    (at 'timestamp (at index (at 'timestamps (read timestamp-table query-id))))
+  )
+
+  (defun get-total-reward-debt:integer ()
+    @doc "Get total reward debt in oracle"
+    (at 'total-reward-debt (read global-table 'global-vars))
+  )
+
+  (defun get-total-stake-amount:integer ()
+    @doc "Get total stake amount in oracle"
+    (at 'total-stake-amount (read global-table 'global-vars))
   )
 
   (defun get-total-stakers:integer ()
     @doc "Get total number of stakers in oracle"
-    (length (keys stake-info))
+    (at 'total-stakers (read global-table 'global-vars))
   )
 
   (defun get-total-time-based-rewards-balance:integer ()
@@ -576,6 +613,14 @@
     (at 'to-withdraw (read global-table 'global-vars))
   )
 
+  (defun reward-rate:integer ()
+    (at 'reward-rate (read global-table 'global-vars))
+  )
+
+  (defun staking-rewards-balance:integer ()
+    (at 'staking-rewards-balance (read global-table 'global-vars))
+  )
+
   (defun staking-token-query-id:string ()
     (at 'staking-token-price-query-id (read global-table 'global-vars))
   )
@@ -587,39 +632,60 @@
 
   (defun is-in-dispute:bool (query-id:string timestamp:integer)
     @doc "Check if given timestamp report for query id is in dispute"
-      (at 'is-disputed (read reports-table (concatenate query-id timestamp)))
+      (at 'is-disputed (read reports (concatenate query-id timestamp)))
   )
 
   (defun retrieve-data:integer (query-id:string timestamp:integer)
     @doc "Get value for a query id at given timestamp"
-      (at 'value (read reports-table (concatenate query-id timestamp)))
+      (at 'value (read reports (concatenate query-id timestamp)))
+  )
+
+   ; *****************************************************************************
+   ; *                                                                           *
+   ; *                          Private functions                                *
+   ; *                                                                           *
+   ; *****************************************************************************
+   (defun accumulated-reward:integer (total-stake-amount:integer total-reward-debt:integer)
+     (/
+       (* (new-accumulated-reward-per-share) total-stake-amount)
+       (- PRECISION total-reward-debt)
+      )
    )
-   ; *****************************************************************************
-   ; *                                                                           *
-   ; *                          Private functions                                 *
-   ; *                                                                           *
-   ; *****************************************************************************
-   (defun get-updated-accumulated-reward-per-share:integer ()
+   (defun new-accumulated-reward-per-share:integer ()
+    @doc "Helper function to calculate new-accumulated-reward-per-share"
     (with-read global-table 'global-vars
       { 'time-of-last-allocation := time-of-last-allocation
       , 'reward-rate := reward-rate
       , 'total-stake-amount := total-stake-amount
       , 'total-reward-debt := total-reward-debt
       , 'staking-rewards-balance := staking-rewards-balance
+      , 'accumulated-reward-per-share := accumulated-reward-per-share
+      }
+      (+
+        accumulated-reward-per-share
+          (/ (* (*
+                (- (block-time-in-seconds) time-of-last-allocation)
+                reward-rate)
+                PRECISION
+            )
+            total-stake-amount))
+    )
+   )
+   (defun get-updated-accumulated-reward-per-share:integer ()
+    @doc "Retrieves updated accumulated-reward-per-share"
+    (require-capability (PRIVATE))
+    (with-read global-table 'global-vars
+      { 'total-stake-amount := total-stake-amount
+      , 'total-reward-debt := total-reward-debt
+      , 'staking-rewards-balance := staking-rewards-balance
       , 'accumulated-reward-per-share := accumulated-reward-per-share }
       (if (= total-stake-amount 0)
         accumulated-reward-per-share
-        ; TODO: consolidate this code
-        (let* ((time-diff (- block-time time-of-last-allocation))
-               (rate (* time-diff reward-rate))
-               (debt (- PRECISION total-reward-debt))
-               (new-pending-rewards (- staking-rewards-balance (/ (* accumulated-reward-per-share total-stake-amount) debt) ))
-               (new-accumulated-reward-per-share (+ accumulated-reward-per-share (/ (* (* time-diff reward-rate) PRECISION) total-stake-amount)))
-               (accumulated-reward (/ (* new-accumulated-reward-per-share total-stake-amount) debt)))
-
-        (if (>= accumulated-reward staking-rewards-balance)
-            (/ (+ accumulated-reward-per-share (* new-pending-rewards PRECISION)))
-            total-stake-amount)))
+        (let ((new-pending-rewards (- staking-rewards-balance (/ (* accumulated-reward-per-share total-stake-amount) (- PRECISION total-reward-debt)) ))
+              (accumulated-reward (accumulated-reward total-stake-amount total-reward-debt)))
+          (if (>= accumulated-reward staking-rewards-balance)
+              (/ (+ accumulated-reward-per-share (* new-pending-rewards PRECISION)))
+              total-stake-amount)))
     )
    )
 
@@ -632,34 +698,91 @@
        , 'total-reward-debt := total-reward-debt
        , 'staking-rewards-balance := staking-rewards-balance
        , 'accumulated-reward-per-share := accumulated-reward-per-share }
-       (let* ( (block-time (block-time-in-seconds))
-               (time-diff (- block-time time-of-last-allocation))
-               (rate (* time-diff reward-rate))
-               (debt (- PRECISION total-reward-debt))
-               (new-pending-rewards (- staking-rewards-balance (/ (* accumulated-reward-per-share total-stake-amount) debt) )))
+       (let ((block-time (block-time-in-seconds)))
              (if
                (= time-of-last-allocation block-time)
-               "was just allocated"
+               "was allocated"
              (if
                (or? (= total-stake-amount) (= reward-rate) 0)
-               (update global-table 'global-vars { 'time-of-last-allocation: block-time})
+               (update global-table 'global-vars { 'time-of-last-allocation: block-time })
+             (let ((accumulated-reward (accumulated-reward total-stake-amount total-reward-debt) ))
              (if
-               (let* ((new-accumulated-reward-per-share (+ accumulated-reward-per-share (/ (* (* time-diff reward-rate) PRECISION) total-stake-amount)))
-               (accumulated-reward (/ (* new-accumulated-reward-per-share total-stake-amount) debt)))
                (>= accumulated-reward staking-rewards-balance)
                (update global-table 'global-vars
-                 { 'accumulated-reward-per-share: (+ accumulated-reward-per-share (/ (* new-pending-rewards PRECISION) total-stake-amount))
+                 { 'accumulated-reward-per-share: (+ accumulated-reward-per-share (/ (* (calculate-reward-rate) PRECISION) total-stake-amount))
                  , 'reward-rate: 0})
-             ; else
-             (update global-table 'global-vars { 'accumulated-reward-per-share: new-accumulated-reward-per-share})))))
+             (update global-table 'global-vars { 'accumulated-reward-per-share: (new-accumulated-reward-per-share)})))))
 
        (update global-table 'global-vars { 'time-of-last-allocation: block-time})
        )
      )
    )
 
-   ; (defun update-stake-and-pay-rewards (staker-address:string new-staked-balance:string)
-   ; )
+   (defun update-stake-and-pay-rewards (staker:string new-staked-balance:integer)
+    (require-capability (PRIVATE))
+    (update-rewards)
+    (with-read staker-details staker
+      { 'staked-balance := staked-balance
+      , 'reward-debt := reward-debt
+      , 'start-vote-count := start-vote-count
+      , 'start-vote-tally := start-vote-tally
+      , 'is-staked := staked
+      }
+      ( with-read global-table 'global-vars
+        { 'token := token:module{fungible-v2}
+        , 'staking-rewards-balance := staking-rewards-balance
+        , 'accumulated-reward-per-share := accumulated-reward-per-share
+        , 'total-stake-amount := total-stake-amount
+        , 'total-reward-debt := total-reward-debt }
+
+      (if (> staked-balance 0)
+
+        (let* ((governance:module{tellor-governance} (get-governance-module))
+               (vote-count (governance::get-vote-count)))
+          (if (> vote-count 0)
+              (let* ((vote-tally (governance::get-vote-tally-by-address staker))
+                     (pending-reward (/ (* staked-balance accumulated-reward-per-share) (- PRECISION reward-debt)))
+                     (temp-pending-reward (/ (* pending-reward (- vote-tally start-vote-tally)) vote-count))
+                     (pay-amount (if (< temp-pending-reward pending-reward) temp-pending-reward pending-reward)))
+                (token::transfer TELLOR_FLEX_ACCOUNT staker pay-amount)
+                (update global-table 'global-vars
+                  { 'staking-rewards-balance: (- staking-rewards-balance pay-amount)
+                  , 'total-reward-debt: (- total-reward-debt reward-debt)
+                  , 'total-stake-amount: (- total-stake-amount staked-balance)}
+                  )) ""
+
+        )
+       ) ""
+      )
+     )
+    )
+    (update staker-details staker { 'staked-balance: new-staked-balance })
+    (with-read staker-details staker
+      { 'staked-balance := staked-balance
+      , 'is-staked := staked
+      , 'reward-debt := reward-debt}
+      (if (>= staked-balance (get-stake-amount))
+          [
+          (if (not staked)
+              (update global-table 'global-vars { 'total-stakers: (+ (get-total-stakers) 1)})
+              0)
+          (update staker-details staker {'is-staked: true })
+          ]
+          [
+          (if (and staked (> (get-total-stakers) 0))
+            (update global-table 'global-vars { "total-stakers": (- (get-total-stakers) 1)})
+            0)
+          (update staker-details staker {'is-staked: false })
+          ]
+      )
+      (update staker-details staker { 'reward-debt: (/ (* staked-balance (accumulated-reward-per-share)) PRECISION)})
+      (update global-table 'global-vars
+        { 'total-stake-amount: (+ (get-total-stake-amount) staked-balance)
+        , 'total-reward-debt: (+ (get-total-reward-debt) reward-debt)
+        , 'reward-rate: (if (= (reward-rate) 0) (/ (calculate-reward-rate) (round (days 30))) (reward-rate))
+        })
+    )
+   )
 ; *****************************************************************************
 ; *                                                                           *
 ; *                          Helper functions                                 *
@@ -673,10 +796,6 @@
     (at 'block-time (chain-data))
    )
 
-   (defun msg-sender:string ()
-    (at 'sender (chain-data))
-   )
-
    (defun block-height:integer ()
     (at 'block-height (chain-data))
    )
@@ -687,6 +806,23 @@
 
    (defun use-precision:integer (amount:decimal)
     (round (* amount PRECISION))
+   )
+
+   (defun calculate-reward-rate:integer ()
+     (with-read global-table 'global-vars
+       { 'staking-rewards-balance := staking-rewards-balance
+       , 'accumulated-reward-per-share := accumulated-reward-per-share
+       , 'total-stake-amount := total-stake-amount
+       , 'total-reward-debt := total-reward-debt
+       }
+       (-
+         staking-rewards-balance
+         (/
+           (* accumulated-reward-per-share total-stake-amount)
+           (- PRECISION total-reward-debt)
+         )
+      )
+     )
    )
 
 )

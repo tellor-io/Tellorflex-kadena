@@ -2,13 +2,13 @@
 ;  https://github.com/thomashoneyman/real-world-pact/tree/main/01-faucet-contract learned alot from this repo.
 
 (env-data { "namespace-keyset": { "keys": [ ], "pred": "keys-all" }, "test-keyset": { "keys": [ ], "pred": "keys-all" } })
-(begin-tx)
+(begin-tx) ;txn 0
 (define-namespace "free" (read-keyset "test-keyset") (read-keyset "namespace-keyset"))
 (commit-tx)
 
 (env-data {})
 
-(begin-tx)
+(begin-tx) ;txn 1
 (load "./root/fungible-v2.pact")
 (load "./root/fungible-xchain-v1.pact")
 (load "./root/coin-v5.pact")
@@ -21,54 +21,84 @@
 (env-sigs [{"key": "tellor-keyset-public-key", "caps": []}])
 
 ;  load tellorflex contract
-(begin-tx)
+(begin-tx) ;txn 2
+(load "./tellor-governance.pact")
+(load "./iflex.pact")
 (load "./tellorflex.pact")
 (load "./governance.pact")
 
-(create-table tellorflex.stake-info)
-(create-table tellorflex.reports-table)
-(create-table tellorflex.timestamp-table)
 (create-table tellorflex.global-table)
+(create-table tellorflex.reports)
+(create-table tellorflex.staker-details)
+(create-table tellorflex.reports-submitted-count)
+(create-table tellorflex.timestamp-table)
+(create-table tellorflex.governance-table)
+(create-table tellorflex.gov-guard)
 ; governance
 (create-table governance.dispute-info)
-(create-table governance.tally)
 (create-table governance.vote-info)
 (create-table governance.vote-rounds)
 (create-table governance.open-disputes-on-id)
 (create-table governance.global)
-(init-global)
 
-(constructor coin 43200 1 1 (* 1 (^ 10 18)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
+(free.tellorflex.constructor coin 43200 1 1 (* 1 (^ 10 18)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
+(init-global tellorflex coin)
+
 (commit-tx)
 ;  clear environment metadata
 (env-sigs [])
 (env-data {})
 
-;  insert fake user keyset
-(env-data { "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" } })
-(env-sigs [{"key": "reporter1-public-key", "caps": []}])
+;  insert fake reporter keysets
+(env-data {
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ] },
+  "reporter2-keyset": { "keys": [ "reporter2-public-key" ] },
+  "reporter3-keyset": { "keys": [ "reporter3-public-key" ] },
+  "reporter4-keyset": { "keys": [ "reporter4-public-key" ] },
+  "reporter5-keyset": { "keys": [ "reporter5-public-key" ] } })
+(env-sigs [
+  {"key": "reporter1-public-key", "caps": []},
+  {"key": "reporter2-public-key", "caps": []},
+  {"key": "reporter3-public-key", "caps": []},
+  {"key": "reporter4-public-key", "caps": []},
+  {"key": "reporter5-public-key", "caps": []}])
 ;  create and define user keyset in free namespace
-(begin-tx)
+(begin-tx) ;txn 3
 (namespace "free")
 (define-keyset "free.reporter1-keyset" (read-keyset "reporter1-keyset"))
+(define-keyset "free.reporter2-keyset" (read-keyset "reporter2-keyset"))
+(define-keyset "free.reporter3-keyset" (read-keyset "reporter3-keyset"))
+(define-keyset "free.reporter4-keyset" (read-keyset "reporter4-keyset"))
+(define-keyset "free.reporter5-keyset" (read-keyset "reporter5-keyset"))
 (commit-tx)
+(env-sigs [])
 (env-data {})
 
-(begin-tx)
-;  create accounts in coin for admin and user to recieve funds
-(coin.create-account "tellorflex" (free.tellorflex.module-assets))
-(coin.create-account "reporter1" (describe-keyset "free.reporter1-keyset"))
+(begin-tx) ;txn 4
+;  create accounts in coin for reporters to recieve funds
+; (coin.create-account "tellorflex" (free.tellorflex.module-assets))
+(coin.create-account "reporter1-keyset" (describe-keyset "free.reporter1-keyset"))
+(coin.create-account "reporter2-keyset" (describe-keyset "free.reporter2-keyset"))
+(coin.create-account "reporter3-keyset" (describe-keyset "free.reporter3-keyset"))
+(coin.create-account "reporter4-keyset" (describe-keyset "free.reporter4-keyset"))
+(coin.create-account "reporter5-keyset" (describe-keyset "free.reporter5-keyset"))
 
 ;  fake capability(only available in testing) then mint tokens
 (test-capability (coin.COINBASE))
-(coin.coinbase "tellorflex" (free.tellorflex.module-assets) 1000.0)
-(coin.coinbase "reporter1" (describe-keyset "free.reporter1-keyset") 1000.0)
+(coin.coinbase "reporter1-keyset" (describe-keyset "free.reporter1-keyset") 1000.0)
+(coin.coinbase "reporter2-keyset" (describe-keyset "free.reporter2-keyset") 1000.0)
+(coin.coinbase "reporter3-keyset" (describe-keyset "free.reporter3-keyset") 1000.0)
+(coin.coinbase "reporter4-keyset" (describe-keyset "free.reporter4-keyset") 1000.0)
+(coin.coinbase "reporter5-keyset" (describe-keyset "free.reporter5-keyset") 1000.0)
 (commit-tx)
 
 (env-gasmodel "table")
 (env-gaslimit 150000)
 
 (print "----------")
-(print "'tellorflex' account created:\n  - keyset: 'tellor-admin-keyset'\n  - public key: 'tellor-keyset-public-key'\n  - balance: 1000.0 KDA")
 (print "'reporter1' account created:\n  - keyset: 'reporter1-keyset'\n  - public key: 'reporter1-public-key'\n  - balance: 1000.0 KDA")
+(print "'reporter2' account created:\n  - keyset: 'reporter2-keyset'\n  - public key: 'reporter2-public-key'\n  - balance: 1000.0 KDA")
+(print "'reporter3' account created:\n  - keyset: 'reporter3-keyset'\n  - public key: 'reporter3-public-key'\n  - balance: 1000.0 KDA")
+(print "'reporter4' account created:\n  - keyset: 'reporter4-keyset'\n  - public key: 'reporter4-public-key'\n  - balance: 1000.0 KDA")
+(print "'reporter5' account created:\n  - keyset: 'reporter5-keyset'\n  - public key: 'reporter5-public-key'\n  - balance: 1000.0 KDA")
 (print "----------")
