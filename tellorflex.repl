@@ -76,7 +76,7 @@
 (env-sigs [])
 (env-sigs [{"key": "tellor-keyset-public-key", "caps": [(free.tellorflex.TELLOR)]}])
 (begin-tx)
-(free.tellorflex.get-data-before "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4" (str-to-int 10 (format-time "%s" (time "1970-01-03T00:00:00Z"))))
+(free.tellorflex.get-data-before "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4" 172799)
 (expect (format "Token {}" [coin]) coin (free.tellorflex.token))
 (free.tellorflex.get-reports-submitted-by-address-and-queryId "reporter1-keyset" "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
 (env-chain-data {'block-time: (time "1970-01-05T00:00:00Z")})

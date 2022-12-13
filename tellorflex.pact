@@ -490,13 +490,20 @@
 
   (defun get-data-before (query-id:string timestamp:integer)
     @doc "Retrieves the latest value for the queryId before the specified timestamp"
-     (at 0
-       (select reports ['timestamp, 'value]
-        (and?
-          (where 'query-id (= query-id))
-          (and?
-            (where 'timestamp (> timestamp))
-            (where 'is-disputed (= false))))))
+    (let* ((data-before (data-before query-id timestamp))
+           (timestamp-before (at 'timestamp-before data-before)))
+      (if (and (at 'found data-before) (not (at 'disputed data-before)))
+        (read reports (concatenate query-id timestamp-before) ['value 'timestamp])
+        {"timestsamp-before": "Not found!"}
+      )
+    )
+     ; (at 0
+     ;   (select reports ['timestamp, 'value]
+     ;    (and?
+     ;      (where 'query-id (= query-id))
+     ;      (and?
+     ;        (where 'timestamp (> timestamp))
+     ;        (where 'is-disputed (= false))))))
   )
 
   (defun get-governance-module ()
@@ -515,9 +522,17 @@
     (- (length timestamps) 1))
   )
 
-  ; (defun get-pending-reward-by-staker:integer (staker-address:string)
-  ;
-  ; )
+  (defun get-pending-reward-by-staker:integer (staker:string)
+    @doc "Returns the pending staking reward for a given address"
+    (with-read stake-info staker
+      { 'staked-balance := staked-balance , 'reward-debt := reward-debt , 'start-vote-count := start-vote-count }
+      (let* ((pending-reward (/ (* staked-balance (get-updated-accumulated-reward-per-share)) (- PRECISION reward-debt)))
+            (governance:module{tellor-governance} (get-governance-module))
+            (vote-count (governance::get-vote-count))
+            (number-of-votes (- vote-count start-vote-count))
+            (vote-tally (if (> number-of-votes 0) (governance::get-vote-tally-by-address staker) 0)))
+          (/ (* pending-reward (- vote-tally start-vote-count)) number-of-votes)))
+  )
 
   (defun get-real-staking-rewards-balance:integer ()
     @doc "Returns the real staking rewards balance after accounting for unclaimed rewards"
@@ -823,6 +838,146 @@
          )
       )
      )
+   )
+
+   (defun search-data-before (a:object b:integer)
+     @doc "helper"
+     (if (and (at 'found a) (not (at 'disputed a)))
+     ; then return object as is
+     a
+     ; else
+     (let* ((timestamps (at 'timestamps a))
+            (target (at 'target a))
+            (start (at 'start a))
+            (end (at 'end a))
+            (middle (/ (- end start) (fold (+) start [2 1]))))
+
+           (if (< (at 'timestamp (at middle timestamps)) target)
+             ; then
+             (if (>= (at 'timestamp (at (+ middle 1) timestamps)) target)
+             ; then
+             (if (not (at 'disputed (at middle timestamps)))
+               { 'found: true
+               , 'target: target
+               , 'start: (+ middle 1)
+               , 'end: end
+               , 'timestamp-before: (at 'timestamp (at middle timestamps))
+               , 'timestamps: timestamps
+               , 'disputed: (at 'disputed (at middle timestamps))
+               }
+               (if (> middle 0)
+                 (fold (search-if-disputed)
+                   { 'found: true
+                   , 'target: target
+                   , 'start: (+ middle 1)
+                   , 'end: middle
+                   , 'timestamp-before: (at 'disputed (at middle timestamps))
+                   , 'timestamps: timestamps
+                   , 'disputed: (at 'disputed (at middle timestamps))
+                   } (enumerate (+ 1 (log 2 (+ middle 1))) 0))
+                   {"timestsamp-before": "Not found!"})
+               )
+             ; else
+               { 'found: false
+               , 'target: target
+               , 'start: (+ middle 1)
+               , 'end: end
+               , 'timestamp-before: (at 'timestamp (at middle timestamps))
+               , 'timestamps: timestamps
+               , 'disputed: (at 'disputed (at middle timestamps))
+               })
+               ; else
+               (if (< (at 'timestamp (at (- middle 1) timestamps)) target)
+               ; then
+               (if (> middle 0)
+                 (fold (search-if-disputed)
+                   { 'found: true
+                   , 'target: target
+                   , 'start: (+ middle 1)
+                   , 'end: middle
+                   , 'timestamp-before: (at 'disputed (at middle timestamps))
+                   , 'timestamps: timestamps
+                   , 'disputed: (at 'disputed (at middle timestamps))
+                   } (enumerate (+ 1 (log 2 (+ middle 1))) 0))
+                   {"timestsamp-before": "Not found!"})
+               ; else
+               { 'found: false
+               , 'target: target
+               , 'start: start
+               , 'end: (- middle 1)
+               , 'timestamp-before: (at 'timestamp (at middle timestamps))
+               , 'timestamps: timestamps
+               , 'disputed: (at 'disputed (at middle timestamps))
+               })
+
+               )
+       )
+     )
+   )
+   (defun search-if-disputed (a:object b:integer)
+     (let ((end (at 'end a))
+           (timestamp (at 'target a))
+           (timestamps (at 'timestamps a)))
+       (if (at 'disputed a) a
+         { 'found: true
+         , 'target: timestamp
+         , 'start: 0
+         , 'end: (- end 1)
+         , 'timestamp-before: (at 'timestamp (at (- end 1) timestamps))
+         , 'timestamps: timestamps
+         , 'disputed: (at 'disputed (at (- end 1) timestamps))
+         }))
+   )
+   (defun data-before (query-id:string timestamp:integer)
+     @doc "helper"
+     (let* ((timestamps (at 'timestamps (read timestamp-table query-id)))
+           (count (length timestamps))
+           (end (- count 1)))
+           (if (>= (at 'timestamp (at 0 timestamps)) timestamp)
+             ; timestamp before doesn't exist
+             ; cause the smallest timestamp is after given timestamp
+             { 'found: false
+             , 'target: timestamp
+             , 'start: 0
+             , 'end: end
+             , 'timestamp-before: (at 'timestamp (at 0 timestamps))
+             , 'timestamps: timestamps
+             , 'disputed: true
+             }
+           ; check if last reported timestamp is less than given timestamp
+           (if (< (at 'timestamp (at end timestamps)) timestamp)
+             ; check if disputed
+             ; if not disputed timestamp has been found so return
+             (if (not (at 'disputed (at end timestamps)))
+               { 'found: true
+               , 'target: timestamp
+               , 'start: 0
+               , 'end: end
+               , 'timestamp-before: (at 'timestamp (at end timestamps))
+               , 'timestamps: timestamps
+               , 'disputed: (at 'disputed (at end timestamps))
+               }
+               ; else search for disputed using log 2 instead of linear?!
+               (fold (search-if-disputed)
+                 { 'found: true
+                 , 'target: timestamp
+                 , 'start: 0
+                 , 'end: end
+                 , 'timestamp-before: (at 'timestamp (at end timestamps))
+                 , 'timestamps: timestamps
+                 , 'disputed: (at 'disputed (at end timestamps))
+                 } (enumerate (+ 1 (log 2 end)) 0)))
+           (fold
+             (search-data-before)
+             { 'found: false
+             , 'start: 0
+             , 'end: end
+             , 'timestamps: timestamps
+             , 'target: timestamp
+             , 'disputed: true
+             }
+             (enumerate (+ 1 (log 2 count)) 0)))))
+
    )
 
 )
