@@ -534,18 +534,21 @@
 
   (defun update-stake-amount ()
     @doc "Updates the stake amount after retrieving the 12 hour old price"
-    (let* ((twelve-hour-price (get-data-before (staking-token-price-query-id) (- (block-time-in-seconds) (reporting-lock))))
-           (price-decoded (str-to-int 10 (base64-decode (at 'value twelve-hour-price))))
+    (let* ((twelve-hour-price (get-data-before (staking-token-price-query-id) (- (block-time-in-seconds) (reporting-lock)))))
+      (if (= twelve-hour-price {"value": "", "timestamp":0}) "no value"
+      (let* ((twelve-hour-price (get-data-before (staking-token-price-query-id) (- (block-time-in-seconds) (reporting-lock))))
            (stake-amount (stake-amount))
            (minimum-stake-amount (minimum-stake-amount))
            (stake-amount-dollar-target (stake-amount-dollar-target))
-           (adjusted-stake-amount (/ (* stake-amount-dollar-target PRECISION) price-decoded)))
+           (price-decoded (str-to-int 10 (base64-decode (at 'value twelve-hour-price))))
+           (adjusted-stake-amount (/ stake-amount-dollar-target price-decoded)))
            ; TODO: validate price
         (if (< adjusted-stake-amount minimum-stake-amount)
           (update global-variables 'global-vars {'stake-amount: minimum-stake-amount})
           (update global-variables 'global-vars {'stake-amount: adjusted-stake-amount})
           )
     )
+    ))
   )
 
   (defun withdraw-stake (staker:string)
@@ -591,17 +594,21 @@
     value:string)
   (defun get-data-before:object{data-before-return} (query-id:string timestamp:integer)
     @doc "Retrieves the latest value for the queryId before the specified timestamp"
-    (let* ((data-before (data-before query-id timestamp))
-           (timestamp-before (at 'timestamp-before data-before))
-           (found (at 'found data-before))
-           (not-disputed (not (at 'disputed data-before))))
-      (if (and found not-disputed)
-        {'value: (at 'value (read reports (concatenate query-id timestamp-before)))
-        , 'timestamp: timestamp-before}
-        {'value: ""
-        , 'timestamp: 0}
+    (let* ((data-before (try {'value: "", 'timestamp: 0} (data-before query-id timestamp))))
+      (if (= {'value: "", 'timestamp: 0} data-before) data-before
+      (let* ((timestamp-before (at 'timestamp-before data-before))
+             (found (at 'found data-before))
+             (not-disputed (not (at 'disputed data-before))))
+        (if (and found not-disputed)
+          {'value: (at 'value (read reports (concatenate query-id timestamp-before)))
+          , 'timestamp: timestamp-before}
+          {'value: ""
+          , 'timestamp: 0}
+        )
+      )
       )
     )
+
      ; (at 0
      ;   (select reports ['timestamp, 'value]
      ;    (and?

@@ -31,9 +31,74 @@
                                         ,"start-vote-count": 0
                                         ,"start-vote-tally": 0}(free.tellorflex.get-staker-info "reporter1-keyset"))
 (rollback-tx)
-; ********************************************************************************
-; "Staker stakes multiple times"
-; ********************************************************************************
+
+
+(env-data {})
+(env-sigs [])
+(env-data {
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 250.0)]},
+  {"key": "reporter1-public-key", "caps": []}])
+(env-chain-data {'block-time: (time "1970-01-02T00:00:00Z")})
+(begin-tx "TBR should not borrow from staking rewards")
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (* 100 (^ 10 18)))
+(free.tellorflex.add-staking-rewards "reporter1-keyset" 150.0)
+(expect "Balance should be 250.0" 250.0 (coin.get-balance "tellorflex"))
+(expect "stakingRewardsBalance" (* 150 (^ 10 18)) (free.tellorflex.staking-rewards-balance))
+(env-chain-data {'block-time: (time "1970-01-03T12:00:00Z")})
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+(expect "Balance should be 250.0" 250.0 (coin.get-balance "tellorflex"))
+(rollback-tx)
+(env-data {})
+(env-sigs [])
+(env-data {
+  "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 10000.0)]},
+  {"key": "reporter2-public-key", "caps": []}])
+(env-chain-data {'block-time: (time "1970-01-02T00:00:00Z")})
+(begin-tx "Test bad TRB price encoding, 12 hours old")
+(test-capability (coin.COINBASE))
+(coin.coinbase "reporter2-keyset" (describe-keyset "free.reporter2-keyset") 10000.0)
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 10000 (^ 10 18)))
+(free.tellorflex.update-stake-amount)
+; MINIMUM_STAKE_AMOUNT = 100
+(expect "Stake amount should be 100" (* 100 (^ 10 18)) (free.tellorflex.stake-amount))
+; advance time 1 hour
+(env-chain-data {'block-time: (time "1970-01-02T01:00:00Z")})
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "5") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
+; advance time 1 hour
+(env-chain-data {'block-time: (time "1970-01-02T02:00:00Z")})
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "75") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
+; advance time 1 hour
+(env-chain-data {'block-time: (time "1970-01-02T03:00:00Z")})
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "100") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
+; advance time 12 hours
+(env-chain-data {'block-time: (time "1970-01-03T15:00:00Z")})
+(free.tellorflex.update-stake-amount)
+(expect "Stake amount should be 100" (* 100 (^ 10 18)) (free.tellorflex.stake-amount))
+; Test bad TRB price encoding
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "Where's the beef?") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
+; advance time 12 hours
+(env-chain-data {'block-time: (time "1970-01-04T03:00:01Z")})
+(expect-failure " "(free.tellorflex.update-stake-amount))
+(expect "Stake amount should be 100" (* 100 (^ 10 18)) (free.tellorflex.stake-amount))
+; advance time 1 hour
+(env-chain-data {'block-time: (time "1970-01-04T04:00:10Z")})
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "350") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
+; advance time 1 hour
+(env-chain-data {'block-time: (time "1970-01-04T05:00:00Z")})
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "400") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
+; advance time 1 hour
+(env-chain-data {'block-time: (time "1970-01-04T06:00:00Z")})
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "450") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
+; advance time 12 hours
+(env-chain-data {'block-time: (time "1970-01-03T18:00:00Z")})
+(free.tellorflex.update-stake-amount)
+(expect "Stake amount should be 100" (* 100 (^ 10 18)) (free.tellorflex.stake-amount))
+(rollback-tx)
+
 (env-sigs [])
 (env-data {})
 (env-data { "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" } })
@@ -56,9 +121,9 @@
                                         ,"start-date": 86400
                                         ,"start-vote-count": 0
                                         ,"start-vote-tally": 0}(free.tellorflex.get-staker-info "reporter1-keyset"))
+
 (env-sigs [])
 (env-data {})
-;
 (env-data { "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" } })
 (env-sigs [{"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 300.0)]},{"key": "reporter1-public-key", "caps": []}])
 (env-chain-data {'block-time: (time "1970-01-02T00:00:00Z"), 'block-height: 1})

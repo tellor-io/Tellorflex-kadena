@@ -53,7 +53,7 @@
   (* 500 (^ 10 18)) ;Staking target price
   (* 50 (^ 10 18)) ;Staking token price
   (* 100 (^ 10 18)) ;Minimum stake amount
-  (base64-encode "{SpotPrice: [trb,usd]}") ;Staking token query id
+  (hash (base64-encode "{SpotPrice: [trb,usd]}")) ;Staking token query id
   )
 (free.governance.init-global
   free.tellorflex ;Oracle contract
