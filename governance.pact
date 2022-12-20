@@ -12,7 +12,7 @@
 
 
 (module governance TELLOR-GOV
-  (implements tellor-governance)
+  (implements i-governance)
 
   (defcap TELLOR-GOV ()
     (enforce-guard (keyset-ref-guard "free.tellor-admin-keyset"))
@@ -21,9 +21,9 @@
   (defcap PRIVATE () true )
 
   ; TODO:
-  (defun capping () (require-capability (PRIVATE)) )
+  (defun capping:bool () (require-capability (PRIVATE)) )
 
-  (defun create-guard () (create-user-guard (capping)) )
+  (defun create-guard:guard () (create-user-guard (capping)) )
 
   (defschema dispute-schema
     query-id:string
@@ -74,14 +74,14 @@
   (deftable dispute-ids-by-reporter:{dispute-ids-by-reporter-schema})
 
 
-  (defun init-global (oracle token)
+  (defun init-global (oracle:module{free.i-flex} token:module{fungible-v2})
     (insert global 'global-vars { 'oracle: oracle , 'token: token, 'team-multisig: "" , 'vote-count: 0 , 'autopay-query-id: ""})
   )
 
   (defun call-tellorflex ()
-    (let ((tellor-flex:module{i-flex} (at 'oracle (read global 'global-vars))))
+    (let ((tellorflex:module{i-flex} (at 'oracle (read global 'global-vars))))
       (with-capability (TELLOR-GOV)
-        (tellor-flex::init-gov-guard (create-guard))
+        (tellorflex::init-gov-guard (create-guard))
       )
     )
   )
@@ -202,6 +202,7 @@
         (>= (- (tellorflex.block-time-in-seconds) start-date) (* 86400 6))) "Time for voting has not elapsed")
       (let* (
         (token-vote-sum
+
           (fold (+) 0
             [(at 'does-support token-holders) (at 'against token-holders) (at 'invalid-query token-holders)]))
         (reporters-vote-sum
@@ -240,6 +241,7 @@
   )
 
   (defun vote (dispute-id:integer supports:bool invalid-query:bool voter-account:string)
+    (enforce-keyset (read-keyset voter-account))
     (with-read vote-info dispute-id
       { 'tally-date := tally-date
       , 'voters := voters
@@ -249,10 +251,11 @@
       , 'team-multisig := team-multisig
 
       }
+      ; TODO: catch errors for voter that doesn't exist as staker info
       (let ((vote-count (at 'vote-count (read global 'global-vars))))
-      (enforce (and (<= dispute-id vote-count) (> dispute-id 0)) "Vote doesn't exist"))
+        (enforce (and (<= dispute-id vote-count) (> dispute-id 0)) "Vote doesn't exist"))
       (enforce = tally-date 0 "Vote has already been tallied")
-      (enforce (not (contains voter-account voters)) "Voter has already voted")
+      (enforce (not (contains voter-account voters)) "Voter has already voted");check how efficient this is?
       (update vote-info dispute-id { 'voters : (+ voters [voter-account])})
       (let* ((token:module{fungible-v2} (at 'token (read global 'global-vars)))
              (team-multisig (at 'team-multisig (read global 'global-vars)))
@@ -279,7 +282,7 @@
                 (update vote-info dispute-id
                   { 'team-multisig: { 'does-support: (at 'does-support team-multisig)
                                     , 'against: (at 'against team-multisig)
-                                    , 'invalid-query: (+ (at 'invalid-query team-multisig))}}) "")
+                                    , 'invalid-query: (+ (at 'invalid-query team-multisig) 1)}}) "")
 
               ]
               (if supports
@@ -433,7 +436,7 @@
 
   (defun get-dispute-fee:integer ()
     @doc "Get the latest dispute fee"
-    (/ (free.tellorflex.get-stake-amount) 10)
+    (/ (free.tellorflex.stake-amount) 10)
   )
 
   (defun get-disputes-by-reporter:[integer] (reporter:string)

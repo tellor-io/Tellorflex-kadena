@@ -1,10 +1,8 @@
 (namespace "free")
-(interface tellor-governance
+(interface i-governance
 
 
   (defun begin-dispute:string (account:string query-id:string timestamp:integer)
-  )
-  (defun execute-vote:string (dispute-id:integer)
   )
   (defun get-vote-count:integer ()
   )

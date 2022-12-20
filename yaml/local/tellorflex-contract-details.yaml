@@ -1,0 +1,4 @@
+code: (describe-module "free.tellorflex")
+publicMeta:
+  chainId: "0"
+  gasLimit: 600

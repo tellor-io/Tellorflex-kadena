@@ -1,0 +1,123 @@
+(load "tellorflex-setup.repl")
+
+(env-sigs [])
+(env-data {})
+(env-chain-data {})
+(print "Realistic test with multiple stakers")
+(env-data
+  { "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" }
+  ,"reporter1": { "keys": [ ], "pred": "keys-all" }
+  , "reporter2": { "keys": [ ], "pred": "keys-all" }
+  , "reporter3": { "keys": [], "pred": "keys-all" }
+  , "reporter4": { "keys": [], "pred": "keys-all" }
+  , "reporter5": { "keys": [], "pred": "keys-all" }
+  , "reporter6": { "keys": [], "pred": "keys-all" }
+  , "reporter7": { "keys": [], "pred": "keys-all" }
+  , "reporter8": { "keys": [], "pred": "keys-all" }
+  , "reporter9": { "keys": [], "pred": "keys-all" }
+  , "reporter10": { "keys": [], "pred": "keys-all" }
+  , "reporter11": { "keys": [], "pred": "keys-all" }
+  , "reporter12": { "keys": [], "pred": "keys-all" }
+  , "reporter13": { "keys": [], "pred": "keys-all" }
+  , "reporter14": { "keys": [], "pred": "keys-all" }
+  , "reporter15": { "keys": [], "pred": "keys-all" }
+  , "reporter16": { "keys": [], "pred": "keys-all" }
+  , "reporter17": { "keys": [], "pred": "keys-all" }
+  , "reporter18": { "keys": [], "pred": "keys-all" }
+  , "reporter19": { "keys": [], "pred": "keys-all" }
+  , "reporter20": { "keys": [], "pred": "keys-all" }
+  })
+(env-sigs [
+  {"key": "user-public-key", "caps": []},
+  {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "tellorflex" 1000.0)]}
+  ,{"key": "reporter1", "caps": [(coin.TRANSFER "reporter1" "tellorflex" 100.0)]}
+  ,{"key": "reporter2", "caps": [(coin.TRANSFER "reporter2" "tellorflex" 100.0)]}
+  ,{"key": "reporter3", "caps": [(coin.TRANSFER "reporter3" "tellorflex" 100.0)]}
+  ,{"key": "reporter4", "caps": [(coin.TRANSFER "reporter4" "tellorflex" 100.0)]}
+  ,{"key": "reporter5", "caps": [(coin.TRANSFER "reporter5" "tellorflex" 100.0)]}
+  ,{"key": "reporter6", "caps": [(coin.TRANSFER "reporter6" "tellorflex" 100.0)]}
+  ,{"key": "reporter7", "caps": [(coin.TRANSFER "reporter7" "tellorflex" 100.0)]}
+  ,{"key": "reporter8", "caps": [(coin.TRANSFER "reporter8" "tellorflex" 100.0)]}
+  ,{"key": "reporter9", "caps": [(coin.TRANSFER "reporter9" "tellorflex" 100.0)]}
+  ,{"key": "reporter10", "caps": [(coin.TRANSFER "reporter10" "tellorflex" 100.0)]}
+  ,{"key": "reporter11", "caps": [(coin.TRANSFER "reporter11" "tellorflex" 100.0)]}
+  ,{"key": "reporter12", "caps": [(coin.TRANSFER "reporter12" "tellorflex" 100.0)]}
+  ,{"key": "reporter13", "caps": [(coin.TRANSFER "reporter13" "tellorflex" 100.0)]}
+  ,{"key": "reporter14", "caps": [(coin.TRANSFER "reporter14" "tellorflex" 100.0)]}
+  ,{"key": "reporter15", "caps": [(coin.TRANSFER "reporter15" "tellorflex" 100.0)]}
+  ,{"key": "reporter16", "caps": [(coin.TRANSFER "reporter16" "tellorflex" 100.0)]}
+  ,{"key": "reporter17", "caps": [(coin.TRANSFER "reporter17" "tellorflex" 100.0)]}
+  ,{"key": "reporter18", "caps": [(coin.TRANSFER "reporter18" "tellorflex" 100.0)]}
+  ,{"key": "reporter19", "caps": [(coin.TRANSFER "reporter19" "tellorflex" 100.0)]}
+  ,{"key": "reporter20", "caps": [(coin.TRANSFER "reporter20" "tellorflex" 100.0)]}
+  ])
+(free.tellorflex.add-staking-rewards "user-keyset" 1000.0)
+(let ((func (lambda (a b)
+  (begin-tx)
+  (namespace "free")
+  (define-keyset (+ "free.reporter" (int-to-str 10 b)) (read-keyset (+ "reporter" (int-to-str 10 b))))
+  (commit-tx)
+  (begin-tx)
+  (coin.create-account (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))))
+  (test-capability (coin.COINBASE))
+  (coin.coinbase (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 1000.0)
+  (commit-tx)
+  (begin-tx)
+  (free.tellorflex.deposit-stake (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) (* 100 (^ 10 18)))
+  (commit-tx)
+  ) ))
+  (fold (func) 0 (enumerate 1 20))
+
+)
+(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (* 84600 10)))})
+(let ((func (lambda (a b)
+  (free.tellorflex.add-staking-rewards "user-keyset" 1.0)
+  (begin-tx)
+  (test-capability (coin.COINBASE))
+  (coin.coinbase (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 100.0)
+  (commit-tx)
+  (begin-tx)
+  (free.tellorflex.deposit-stake (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) (* 100 (^ 10 18)))
+  (commit-tx)
+  ) ))
+  (fold (func) 0 (enumerate 1 20))
+
+)
+
+(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (+ 846000 (* 84600 10))))})
+(let ((func (lambda (a b)
+  (free.tellorflex.add-staking-rewards "user-keyset" 1.0)
+  (begin-tx)
+  (test-capability (coin.COINBASE))
+  (coin.coinbase (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 100.0)
+  (commit-tx)
+  (begin-tx)
+  (free.tellorflex.deposit-stake (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) (* 100 (^ 10 18)))
+  (commit-tx)
+  ) ))
+  (fold (func) 0 (enumerate 1 20))
+
+)
+(format-time "%s" (at 'block-time (chain-data)))
+(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (+ 1692000 (* 84600 60))))})
+(let ((func (lambda (a b)
+  (let* ((staker-info (free.tellorflex.get-staker-info (+ "reporter" (int-to-str 10 b)) ))
+         (stake-balance (at 'staked-balance staker-info)))
+        (begin-tx)
+        (free.tellorflex.request-staking-withdraw (+ "reporter" (int-to-str 10 b)) stake-balance)
+        (commit-tx))
+  ) ))
+  (fold (func) 0 (enumerate 1 20))
+
+)
+
+(format-time "%s" (at 'block-time (chain-data)))
+(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (+ 6768000 (* 84600 8))))})
+(let ((func (lambda (a b)
+  (begin-tx)
+  (free.tellorflex.withdraw-stake (+ "reporter" (int-to-str 10 b)) )
+  (commit-tx)
+  ) ))
+  (fold (func) 0 (enumerate 1 20))
+
+)

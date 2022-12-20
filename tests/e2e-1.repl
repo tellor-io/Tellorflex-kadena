@@ -1,0 +1,76 @@
+(load "tellorflex-setup.repl" )
+
+(print "Staked multiple times, disputed but keeps reporting")
+(env-data { "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" }, "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" } })
+(env-sigs [{"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 300.0)]},{"key": "reporter1-public-key", "caps": []}])
+(env-chain-data {'block-time: (time "1970-01-02T00:00:00Z"), 'block-height: 1})
+(begin-tx)
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (* 300 (^ 10 18)))
+(free.tellorflex.get-staker-info "reporter1-keyset")
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+(expect "new-value-count-by-query-id should be 1" 1 (free.tellorflex.get-new-value-countby-query-id (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+(expect "retrieve-data should be 100" (base64-encode "100") (free.tellorflex.retrieve-data (hash (base64-encode "{SpotPrice: [eth,usd]}")) 86400))
+(expect-failure "free.governance.PRIVATE" (free.tellorflex.remove-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) 86400))
+(test-capability (free.governance.PRIVATE))
+(free.tellorflex.remove-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) 86400)
+(free.tellorflex.slash-reporter "reporter1-keyset" "reporter2-keyset")
+(env-data { "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" } })
+(env-sigs [{"key": "reporter1-public-key", "caps": []}])
+; await h.advanceTime(86400 / 2 / 3)
+(env-chain-data {'block-time: (time "1970-01-02T04:00:00Z"), 'block-height: 3})
+(expect-failure "Still in reporter lock"(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset"))
+(env-chain-data {'block-time: (time "1970-01-02T08:00:00Z"), 'block-height: 3})
+(expect "should still have money staked" {"guard": (describe-keyset "free.reporter1-keyset")
+                                        ,"is-staked": true
+                                        ,"locked-balance": 0
+                                        ,"reporter-last-timestamp": 86400
+                                        ,"reports-submitted": 1
+                                        ,"reward-debt": 0
+                                        ,"staked-balance": (* 200 (^ 10 18))
+                                        ,"start-date": 86400
+                                        ,"start-vote-count": 0
+                                        ,"start-vote-tally": 0}(free.tellorflex.get-staker-info "reporter1-keyset"))
+(rollback-tx)
+; ********************************************************************************
+; "Staker stakes multiple times"
+; ********************************************************************************
+(env-sigs [])
+(env-data {})
+(env-data { "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 300.0)]},
+  {"key": "reporter1-public-key", "caps": []}])
+(env-chain-data {'block-time: (time "1970-01-02T00:00:00Z"), 'block-height: 1})
+(begin-tx "Staker stakes multiple times")
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (* 100 (^ 10 18)))
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (* 100 (^ 10 18)))
+(commit-tx)
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (* 100 (^ 10 18)))
+(expect "should stil have money staked" {"guard": (describe-keyset "free.reporter1-keyset")
+                                        ,"is-staked": true
+                                        ,"locked-balance": 0
+                                        ,"reporter-last-timestamp": 0
+                                        ,"reports-submitted": 0
+                                        ,"reward-debt": 0
+                                        ,"staked-balance": (* 300 (^ 10 18))
+                                        ,"start-date": 86400
+                                        ,"start-vote-count": 0
+                                        ,"start-vote-tally": 0}(free.tellorflex.get-staker-info "reporter1-keyset"))
+(env-sigs [])
+(env-data {})
+;
+(env-data { "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" } })
+(env-sigs [{"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 300.0)]},{"key": "reporter1-public-key", "caps": []}])
+(env-chain-data {'block-time: (time "1970-01-02T00:00:00Z"), 'block-height: 1})
+(print "Bad value placed, withdraw requested, dispute started")
+(begin-tx "Deposit 120 tokens")
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (* 120 (^ 10 18)))
+(commit-tx)
+(begin-tx "submit value (eth/usd)")
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "4000") 0 (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+(commit-tx)
+(free.tellorflex.request-staking-withdraw "reporter1-keyset"(* 120 (^ 10 18)))
+(test-capability (free.governance.PRIVATE))
+(free.tellorflex.remove-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) 86400)
+(free.tellorflex.slash-reporter "reporter1-keyset" "reporter2-keyset")
+(expect-failure "7 days didn't pass"(free.tellorflex.withdraw-stake "reporter1-keyset"))

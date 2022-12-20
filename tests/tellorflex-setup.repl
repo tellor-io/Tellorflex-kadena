@@ -9,9 +9,9 @@
 (env-data {})
 
 (begin-tx) ;txn 1
-(load "./root/fungible-v2.pact")
-(load "./root/fungible-xchain-v1.pact")
-(load "./root/coin-v5.pact")
+(load "../root/fungible-v2.pact")
+(load "../root/fungible-xchain-v1.pact")
+(load "../root/coin-v5.pact")
 
 (create-table coin.coin-table)
 (create-table coin.allocation-table)
@@ -22,46 +22,71 @@
 
 ;  load tellorflex contract
 (begin-tx) ;txn 2
-(load "./tellor-governance.pact")
-(load "./iflex.pact")
-(load "./tellorflex.pact")
-(load "./governance.pact")
+(load "../i-governance.pact")
+(load "../i-flex.pact")
+(load "../tellorflex.pact")
+(load "../governance.pact")
+(load "../testing/governance-mock.pact")
 
-(create-table tellorflex.global-table)
+; tellorflex(oracle) tables
+(create-table tellorflex.global-variables)
 (create-table tellorflex.reports)
 (create-table tellorflex.staker-details)
 (create-table tellorflex.reports-submitted-count)
-(create-table tellorflex.timestamp-table)
+(create-table tellorflex.timestamps)
 (create-table tellorflex.governance-table)
 (create-table tellorflex.gov-guard)
-; governance
+; governance tables
 (create-table governance.dispute-info)
 (create-table governance.vote-info)
 (create-table governance.vote-rounds)
 (create-table governance.open-disputes-on-id)
 (create-table governance.global)
 
-(free.tellorflex.constructor coin 43200 1 1 (* 1 (^ 10 18)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
-(init-global tellorflex coin)
+(create-table governance-mock.global)
+(create-table governance-mock.vote-table)
+(create-table governance-mock.vote-tally)
 
+(free.tellorflex.constructor
+  coin ;Token contract
+  43200 ;Reporting lock
+  (* 500 (^ 10 18)) ;Staking target price
+  (* 50 (^ 10 18)) ;Staking token price
+  (* 100 (^ 10 18)) ;Minimum stake amount
+  (base64-encode "{SpotPrice: [trb,usd]}") ;Staking token query id
+  )
+(free.governance.init-global
+  free.tellorflex ;Oracle contract
+  coin ;Token contract
+  )
+(free.governance-mock.constructor free.tellorflex)
+; Check governance address not initialized in tellorflex
+(expect-failure "row not found" (free.tellorflex.get-governance-module))
+; Input governance address in tellorflex
+(free.tellorflex.init free.governance-mock)
+; Additional step that stores governance guard in tellorflex (Owner only)
+(free.governance.call-tellorflex)
+; Expect failure when trying to input governance address again
+(expect-failure "row found for key" (free.tellorflex.init "governance place holder"))
 (commit-tx)
 ;  clear environment metadata
 (env-sigs [])
 (env-data {})
-
 ;  insert fake reporter keysets
 (env-data {
   "reporter1-keyset": { "keys": [ "reporter1-public-key" ] },
   "reporter2-keyset": { "keys": [ "reporter2-public-key" ] },
   "reporter3-keyset": { "keys": [ "reporter3-public-key" ] },
   "reporter4-keyset": { "keys": [ "reporter4-public-key" ] },
-  "reporter5-keyset": { "keys": [ "reporter5-public-key" ] } })
+  "reporter5-keyset": { "keys": [ "reporter5-public-key" ] },
+  "user-keyset": { "keys": [ "user-public-key" ] }})
 (env-sigs [
   {"key": "reporter1-public-key", "caps": []},
   {"key": "reporter2-public-key", "caps": []},
   {"key": "reporter3-public-key", "caps": []},
   {"key": "reporter4-public-key", "caps": []},
-  {"key": "reporter5-public-key", "caps": []}])
+  {"key": "reporter5-public-key", "caps": []},
+  {"key": "user-public-key", "caps": []}])
 ;  create and define user keyset in free namespace
 (begin-tx) ;txn 3
 (namespace "free")
@@ -70,6 +95,7 @@
 (define-keyset "free.reporter3-keyset" (read-keyset "reporter3-keyset"))
 (define-keyset "free.reporter4-keyset" (read-keyset "reporter4-keyset"))
 (define-keyset "free.reporter5-keyset" (read-keyset "reporter5-keyset"))
+(define-keyset "free.user-keyset" (read-keyset "user-keyset"))
 (commit-tx)
 (env-sigs [])
 (env-data {})
@@ -82,6 +108,7 @@
 (coin.create-account "reporter3-keyset" (describe-keyset "free.reporter3-keyset"))
 (coin.create-account "reporter4-keyset" (describe-keyset "free.reporter4-keyset"))
 (coin.create-account "reporter5-keyset" (describe-keyset "free.reporter5-keyset"))
+(coin.create-account "user-keyset" (describe-keyset "free.user-keyset"))
 
 ;  fake capability(only available in testing) then mint tokens
 (test-capability (coin.COINBASE))
@@ -90,6 +117,7 @@
 (coin.coinbase "reporter3-keyset" (describe-keyset "free.reporter3-keyset") 1000.0)
 (coin.coinbase "reporter4-keyset" (describe-keyset "free.reporter4-keyset") 1000.0)
 (coin.coinbase "reporter5-keyset" (describe-keyset "free.reporter5-keyset") 1000.0)
+(coin.coinbase "user-keyset" (describe-keyset "free.user-keyset") 1000.0)
 (commit-tx)
 
 (env-gasmodel "table")
@@ -101,4 +129,5 @@
 (print "'reporter3' account created:\n  - keyset: 'reporter3-keyset'\n  - public key: 'reporter3-public-key'\n  - balance: 1000.0 KDA")
 (print "'reporter4' account created:\n  - keyset: 'reporter4-keyset'\n  - public key: 'reporter4-public-key'\n  - balance: 1000.0 KDA")
 (print "'reporter5' account created:\n  - keyset: 'reporter5-keyset'\n  - public key: 'reporter5-public-key'\n  - balance: 1000.0 KDA")
+(print "'user' account created:\n  - keyset: 'user-keyset'\n  - public key: 'user-public-key'\n  - balance: 1000.0 KDA")
 (print "----------")
