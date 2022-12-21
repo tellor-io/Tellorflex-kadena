@@ -22,7 +22,7 @@
   @model
     [ (defproperty owner-authorized (authorized-by "free.tellor-admin-keyset"))
     ]
-    (implements i-flex)
+    (implements free.i-flex)
 ; *****************************************************************************
 ; *                                                                           *
 ; *                          Constants                                        *
@@ -419,7 +419,8 @@
                    stake-amount
                    (+ staked-balance locked-balance))))
       (with-capability (GOV_GUARD)
-      (install-capability (token::TRANSFER TELLOR_FLEX_ACCOUNT recipient (to-decimal slash-amount)))
+      (install-capability (token::TRANSFER TELLOR_FLEX_ACCOUNT recipient
+        (to-decimal slash-amount)))
 
         (if (>= locked-balance stake-amount)
             [(update staker-details reporter
@@ -502,12 +503,12 @@
             (let ((time-reward (calculate-time-based-reward block-time))
                   (token:module{fungible-v2} (token)))
               (if (> time-reward 0.0)
-                (let ((cap (install-capability (token::TRANSFER TELLOR_FLEX_ACCOUNT staker time-reward))))
-                  cap
+                (let ((transfer-cap
+                  (install-capability
+                    (token::TRANSFER TELLOR_FLEX_ACCOUNT staker time-reward))))
+                  transfer-cap
                   (token::transfer TELLOR_FLEX_ACCOUNT staker time-reward)
                 )
-
-
                   "pass"
               )
             )
@@ -534,7 +535,10 @@
 
   (defun update-stake-amount ()
     @doc "Updates the stake amount after retrieving the 12 hour old price"
-    (let* ((twelve-hour-price (get-data-before (staking-token-price-query-id) (- (block-time-in-seconds) (reporting-lock)))))
+    (let* ((twelve-hour-price
+      (get-data-before
+        (staking-token-price-query-id)
+        (- (block-time-in-seconds) (reporting-lock)))))
       (if (= twelve-hour-price {"value": "", "timestamp":0}) "no value"
       (let* ((twelve-hour-price (get-data-before (staking-token-price-query-id) (- (block-time-in-seconds) (reporting-lock))))
            (stake-amount (stake-amount))
@@ -547,8 +551,9 @@
           (update global-variables 'global-vars {'stake-amount: minimum-stake-amount})
           (update global-variables 'global-vars {'stake-amount: adjusted-stake-amount})
           )
+     )
     )
-    ))
+   )
   )
 
   (defun withdraw-stake (staker:string)
@@ -579,9 +584,9 @@
 ; *                          Getter functions                                 *
 ; *                                                                           *
 ; *****************************************************************************
-  (defun get-block-number-by-timestamp (query-id:string timestamp:integer)
+  (defun get-block-number-by-timestamp:integer (query-id:string timestamp:integer)
     @doc "Returns the block number at a given timestamp"
-    (at 'block-height (read reports (concatenate query-id timestamp)))
+    (try 0 (at 'block-height (read reports (concatenate query-id timestamp))))
   )
 
   (defun get-current-value (query-id:string)
@@ -592,6 +597,7 @@
   (defschema data-before-return
     timestamp:integer
     value:string)
+
   (defun get-data-before:object{data-before-return} (query-id:string timestamp:integer)
     @doc "Retrieves the latest value for the queryId before the specified timestamp"
     (let* ((data-before (try {'value: "", 'timestamp: 0} (data-before query-id timestamp))))
@@ -602,20 +608,11 @@
         (if (and found not-disputed)
           {'value: (at 'value (read reports (concatenate query-id timestamp-before)))
           , 'timestamp: timestamp-before}
-          {'value: ""
-          , 'timestamp: 0}
+          {'value: "", 'timestamp: 0}
+        )
         )
       )
-      )
     )
-
-     ; (at 0
-     ;   (select reports ['timestamp, 'value]
-     ;    (and?
-     ;      (where 'query-id (= query-id))
-     ;      (and?
-     ;        (where 'timestamp (> timestamp))
-     ;        (where 'is-disputed (= false))))))
   )
 
   (defun get-new-value-countby-query-id:integer (query-id:string)
@@ -705,7 +702,7 @@
       }
       (let ((token:module{fungible-v2} (token)))
       (-
-        (token::get-balance TELLOR_FLEX_ACCOUNT)
+        (precision (token::get-balance TELLOR_FLEX_ACCOUNT))
         (fold (+) to-withdraw [total-stake-amount staking-rewards-balance]))
       ))
   )

@@ -1,0 +1,43 @@
+(load "tellorflex-setup.repl")
+(env-data {})
+(env-sigs [])
+(env-data {
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" },
+  "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 200.0), (coin.TRANSFER "reporter2-keyset" "reporter1-keyset" 800.0)]},
+  {"key": "reporter2-public-key", "caps": []}])
+(env-chain-data {'block-time: (time "1970-01-02T00:00:00Z")})
+(begin-tx "TBR + stakes + staking rewards == balanceOf(flexAddress)")
+(test-capability (coin.COINBASE))
+(test-capability (free.tellorflex.PRIVATE))
+(coin.coinbase "tellorflex" (free.tellorflex.create-guard) 100.0)
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 100 (^ 10 18)))
+(free.tellorflex.add-staking-rewards "reporter2-keyset" 100.0)
+(coin.transfer "reporter2-keyset" "reporter1-keyset" (coin.get-balance "reporter2-keyset"))
+(expect "contract balance should be 300.0" 300.0 (coin.get-balance "tellorflex"))
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "420") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
+(let* ((tbr (free.tellorflex.get-total-time-based-rewards-balance))
+      (rewards-given (- (* 100 (^ 10 18)) tbr)))
+      (expect "" 300.0 (+ (coin.get-balance "tellorflex") (free.tellorflex.to-decimal rewards-given)) )
+)
+(commit-tx)
+(begin-tx)
+; request-withdraw by 2 10
+(free.tellorflex.request-staking-withdraw "reporter2-keyset" (* 10 (^ 10 18)))
+(commit-tx)
+; advance time 7 days
+(env-chain-data {'block-time: (time "1970-01-09T00:00:01Z")})
+(begin-tx)
+; withdraw-stake
+(free.tellorflex.withdraw-stake "reporter2-keyset")
+(let* ((staking-rewards (free.tellorflex.staking-rewards-balance))
+      (total-stakes (free.tellorflex.total-stake-amount))
+      (tbr (free.tellorflex.get-total-time-based-rewards-balance))
+      (tellor-balance (coin.get-balance "tellorflex"))
+      (account-balance (coin.get-balance "reporter2-keyset"))
+      (token-balances (+ tellor-balance account-balance))
+      (sum (fold (+) staking-rewards [total-stakes tbr])))
+    (expect "" tellor-balance (free.tellorflex.to-decimal sum))
+    (expect "All tokens accounted for" 300.0 token-balances)
+)

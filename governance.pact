@@ -36,7 +36,7 @@
     against:integer
     invalid-query:integer)
   (defschema global-schema
-    oracle:module{i-flex}
+    oracle:module{free.i-flex}
     token:module{fungible-v2}
     team-multisig:string
     vote-count:integer
@@ -88,19 +88,18 @@
 
   (defun begin-dispute:string (account:string query-id:string timestamp:integer)
     @doc "Initializes a dispute/vote in the system"
-
-    (enforce (!= (tellorflex.get-block-number-by-timestamp query-id timestamp) 0) "No value exists at given timestamp")
-
-    (let ((hash (hash [query-id timestamp]))
-          (dispute-id (+ (at 'vote-count (read global 'global-vars)) 1))
-          (dispute-fee (get-dispute-fee))
-          (block-time (tellorflex.block-time-in-seconds))
-          (disputed-reporter (tellorflex.get-reporter-by-timestamp query-id timestamp)))
-
+    (let* ((tellorflex:module{free.i-flex} (at 'oracle (read global 'global-vars)))
+           (block-number (tellorflex::get-block-number-by-timestamp query-id timestamp))
+           (hash (hash [query-id timestamp]))
+           (dispute-id (+ (at 'vote-count (read global 'global-vars)) 1))
+           (dispute-fee (get-dispute-fee))
+           (block-time (tellorflex.block-time-in-seconds))
+           (disputed-reporter (tellorflex.get-reporter-by-timestamp query-id timestamp)))
+        (enforce (!= block-number 0) "No value exists at given timestamp")
         (with-default-read vote-rounds hash { 'dispute-ids: []} { 'dispute-ids := dispute-ids }
-          (write vote-rounds hash { 'dispute-ids: (+ dispute-ids dispute-id)})
+          (write vote-rounds hash { 'dispute-ids: (+ dispute-ids [dispute-id])})
         )
-        (write vote-info dispute-id
+        (insert vote-info dispute-id
           { 'identifier-hash: hash
           , 'vote-round: (length (at 'dispute-ids (read vote-rounds hash)))
           , 'start-date: block-time
@@ -117,7 +116,7 @@
           , 'voters: []
           })
 
-        (write dispute-info dispute-id
+        (insert dispute-info dispute-id
           { 'query-id: query-id
           , 'timestamp: timestamp
           , 'value: ""
@@ -125,7 +124,7 @@
           , 'slashed-amount: 0
           })
         (with-default-read dispute-ids-by-reporter disputed-reporter { 'dispute-ids: [] }{ 'dispute-ids := dispute-ids }
-          (update dispute-ids-by-reporter disputed-reporter { 'dispute-ids: (+ dispute-ids [dispute-id])}))
+          (write dispute-ids-by-reporter disputed-reporter { 'dispute-ids: (+ dispute-ids [dispute-id])}))
 
           (if (= vote-rounds 1)
             (begin-dispute-pact account dispute-id query-id timestamp)
@@ -137,7 +136,9 @@
   )
 
   (defun execute-vote:string (dispute-id:integer)
-    (enforce (and (<= dispute-id (length (keys dispute-info))) (> dispute-id 0)) "Dispute ID must be valid")
+    (enforce (and
+      (<= dispute-id (at 'vote-count (read global 'global-vars)))
+      (> dispute-id 0)) "Dispute ID must be valid")
     (with-read vote-info dispute-id
       { 'executed := executed
       , 'tally-date := tally-date
@@ -145,10 +146,10 @@
       , 'hash := hash
       , 'result := result
       }
-      (enforce (not (executed)) "Vote has already been executed")
+      (enforce (not executed) "Vote has already been executed")
       (enforce (> tally-date 0) "Vote must be tallied")
       (with-read vote-rounds hash { 'dispute-ids := dispute-ids }
-        (enforce (= (length dispute-ids vote-round)) "Must be the final vote")
+        (enforce (= (length dispute-ids) vote-round) "Must be the final vote")
         (enforce (>= (- (tellorflex.block-time-in-seconds) tally-date) (days 1)) "1 day has to pass after tally to allow for disputes"))
       (update vote-info dispute-id { 'executed: true })
 
@@ -175,8 +176,8 @@
                   'governance
                   (at 'disputed-reporter (read dispute-info dispute-id))
                   (+ (fold (vote-failed) 0 (at 'dispute-ids (read vote-rounds hash))) (at 'slashed-amount (read dispute-info dispute-id)))
-                "Invalid result"
               )
+              "Invalid result"
             )
           )
         )
@@ -403,7 +404,8 @@
     (let* ((vote-round (at 'dispute-ids (read vote-rounds hash)))
            (vote-id (at (- idx 1) vote-round))
            (token:module{fungible-v2} (at 'token (read global 'global-vars))))
-      (with-read vote-info vote-id { 'initiator := initiator , 'slashed-amount := slashed-amount , 'fee := fee }
+      (with-read vote-info vote-id
+        { 'initiator := initiator , 'slashed-amount := slashed-amount , 'fee := fee }
         (token::transfer 'governance initiator fee)
       )
     )
@@ -436,7 +438,8 @@
 
   (defun get-dispute-fee:integer ()
     @doc "Get the latest dispute fee"
-    (/ (free.tellorflex.stake-amount) 10)
+    (let ((tellorflex:module{free.i-flex} (at 'oracle (read global 'global-vars))))
+      (/ (tellorflex::stake-amount) 10))
   )
 
   (defun get-disputes-by-reporter:[integer] (reporter:string)
