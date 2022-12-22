@@ -12,7 +12,7 @@
 
 
 (module governance TELLOR-GOV
-  (implements tellor-governance)
+  (implements i-governance)
 
   (defcap TELLOR-GOV ()
     (enforce-guard (keyset-ref-guard "free.tellor-admin-keyset"))
@@ -21,9 +21,9 @@
   (defcap PRIVATE () true )
 
   ; TODO:
-  (defun capping () (require-capability (PRIVATE)) )
+  (defun capping:bool () (require-capability (PRIVATE)) )
 
-  (defun create-guard () (create-user-guard (capping)) )
+  (defun create-guard:guard () (create-user-guard (capping)) )
 
   (defschema dispute-schema
     query-id:string
@@ -36,7 +36,7 @@
     against:integer
     invalid-query:integer)
   (defschema global-schema
-    oracle:module{i-flex}
+    oracle:module{free.i-flex}
     token:module{fungible-v2}
     team-multisig:string
     vote-count:integer
@@ -74,33 +74,32 @@
   (deftable dispute-ids-by-reporter:{dispute-ids-by-reporter-schema})
 
 
-  (defun init-global (oracle token)
+  (defun init-global (oracle:module{free.i-flex} token:module{fungible-v2})
     (insert global 'global-vars { 'oracle: oracle , 'token: token, 'team-multisig: "" , 'vote-count: 0 , 'autopay-query-id: ""})
   )
 
   (defun call-tellorflex ()
-    (let ((tellor-flex:module{i-flex} (at 'oracle (read global 'global-vars))))
+    (let ((tellorflex:module{i-flex} (at 'oracle (read global 'global-vars))))
       (with-capability (TELLOR-GOV)
-        (tellor-flex::init-gov-guard (create-guard))
+        (tellorflex::init-gov-guard (create-guard))
       )
     )
   )
 
   (defun begin-dispute:string (account:string query-id:string timestamp:integer)
     @doc "Initializes a dispute/vote in the system"
-
-    (enforce (!= (tellorflex.get-block-number-by-timestamp query-id timestamp) 0) "No value exists at given timestamp")
-
-    (let ((hash (hash [query-id timestamp]))
-          (dispute-id (+ (at 'vote-count (read global 'global-vars)) 1))
-          (dispute-fee (get-dispute-fee))
-          (block-time (tellorflex.block-time-in-seconds))
-          (disputed-reporter (tellorflex.get-reporter-by-timestamp query-id timestamp)))
-
+    (let* ((tellorflex:module{free.i-flex} (at 'oracle (read global 'global-vars)))
+           (block-number (tellorflex::get-block-number-by-timestamp query-id timestamp))
+           (hash (hash [query-id timestamp]))
+           (dispute-id (+ (at 'vote-count (read global 'global-vars)) 1))
+           (dispute-fee (get-dispute-fee))
+           (block-time (tellorflex.block-time-in-seconds))
+           (disputed-reporter (tellorflex.get-reporter-by-timestamp query-id timestamp)))
+        (enforce (!= block-number 0) "No value exists at given timestamp")
         (with-default-read vote-rounds hash { 'dispute-ids: []} { 'dispute-ids := dispute-ids }
-          (write vote-rounds hash { 'dispute-ids: (+ dispute-ids dispute-id)})
+          (write vote-rounds hash { 'dispute-ids: (+ dispute-ids [dispute-id])})
         )
-        (write vote-info dispute-id
+        (insert vote-info dispute-id
           { 'identifier-hash: hash
           , 'vote-round: (length (at 'dispute-ids (read vote-rounds hash)))
           , 'start-date: block-time
@@ -117,7 +116,7 @@
           , 'voters: []
           })
 
-        (write dispute-info dispute-id
+        (insert dispute-info dispute-id
           { 'query-id: query-id
           , 'timestamp: timestamp
           , 'value: ""
@@ -125,7 +124,7 @@
           , 'slashed-amount: 0
           })
         (with-default-read dispute-ids-by-reporter disputed-reporter { 'dispute-ids: [] }{ 'dispute-ids := dispute-ids }
-          (update dispute-ids-by-reporter disputed-reporter { 'dispute-ids: (+ dispute-ids [dispute-id])}))
+          (write dispute-ids-by-reporter disputed-reporter { 'dispute-ids: (+ dispute-ids [dispute-id])}))
 
           (if (= vote-rounds 1)
             (begin-dispute-pact account dispute-id query-id timestamp)
@@ -137,7 +136,9 @@
   )
 
   (defun execute-vote:string (dispute-id:integer)
-    (enforce (and (<= dispute-id (length (keys dispute-info))) (> dispute-id 0)) "Dispute ID must be valid")
+    (enforce (and
+      (<= dispute-id (at 'vote-count (read global 'global-vars)))
+      (> dispute-id 0)) "Dispute ID must be valid")
     (with-read vote-info dispute-id
       { 'executed := executed
       , 'tally-date := tally-date
@@ -145,10 +146,10 @@
       , 'hash := hash
       , 'result := result
       }
-      (enforce (not (executed)) "Vote has already been executed")
+      (enforce (not executed) "Vote has already been executed")
       (enforce (> tally-date 0) "Vote must be tallied")
       (with-read vote-rounds hash { 'dispute-ids := dispute-ids }
-        (enforce (= (length dispute-ids vote-round)) "Must be the final vote")
+        (enforce (= (length dispute-ids) vote-round) "Must be the final vote")
         (enforce (>= (- (tellorflex.block-time-in-seconds) tally-date) (days 1)) "1 day has to pass after tally to allow for disputes"))
       (update vote-info dispute-id { 'executed: true })
 
@@ -175,8 +176,8 @@
                   'governance
                   (at 'disputed-reporter (read dispute-info dispute-id))
                   (+ (fold (vote-failed) 0 (at 'dispute-ids (read vote-rounds hash))) (at 'slashed-amount (read dispute-info dispute-id)))
-                "Invalid result"
               )
+              "Invalid result"
             )
           )
         )
@@ -202,6 +203,7 @@
         (>= (- (tellorflex.block-time-in-seconds) start-date) (* 86400 6))) "Time for voting has not elapsed")
       (let* (
         (token-vote-sum
+
           (fold (+) 0
             [(at 'does-support token-holders) (at 'against token-holders) (at 'invalid-query token-holders)]))
         (reporters-vote-sum
@@ -240,6 +242,7 @@
   )
 
   (defun vote (dispute-id:integer supports:bool invalid-query:bool voter-account:string)
+    (enforce-keyset (read-keyset voter-account))
     (with-read vote-info dispute-id
       { 'tally-date := tally-date
       , 'voters := voters
@@ -249,10 +252,11 @@
       , 'team-multisig := team-multisig
 
       }
+      ; TODO: catch errors for voter that doesn't exist as staker info
       (let ((vote-count (at 'vote-count (read global 'global-vars))))
-      (enforce (and (<= dispute-id vote-count) (> dispute-id 0)) "Vote doesn't exist"))
+        (enforce (and (<= dispute-id vote-count) (> dispute-id 0)) "Vote doesn't exist"))
       (enforce = tally-date 0 "Vote has already been tallied")
-      (enforce (not (contains voter-account voters)) "Voter has already voted")
+      (enforce (not (contains voter-account voters)) "Voter has already voted");check how efficient this is?
       (update vote-info dispute-id { 'voters : (+ voters [voter-account])})
       (let* ((token:module{fungible-v2} (at 'token (read global 'global-vars)))
              (team-multisig (at 'team-multisig (read global 'global-vars)))
@@ -279,7 +283,7 @@
                 (update vote-info dispute-id
                   { 'team-multisig: { 'does-support: (at 'does-support team-multisig)
                                     , 'against: (at 'against team-multisig)
-                                    , 'invalid-query: (+ (at 'invalid-query team-multisig))}}) "")
+                                    , 'invalid-query: (+ (at 'invalid-query team-multisig) 1)}}) "")
 
               ]
               (if supports
@@ -400,7 +404,8 @@
     (let* ((vote-round (at 'dispute-ids (read vote-rounds hash)))
            (vote-id (at (- idx 1) vote-round))
            (token:module{fungible-v2} (at 'token (read global 'global-vars))))
-      (with-read vote-info vote-id { 'initiator := initiator , 'slashed-amount := slashed-amount , 'fee := fee }
+      (with-read vote-info vote-id
+        { 'initiator := initiator , 'slashed-amount := slashed-amount , 'fee := fee }
         (token::transfer 'governance initiator fee)
       )
     )
@@ -433,7 +438,8 @@
 
   (defun get-dispute-fee:integer ()
     @doc "Get the latest dispute fee"
-    (/ (free.tellorflex.get-stake-amount) 10)
+    (let ((tellorflex:module{free.i-flex} (at 'oracle (read global 'global-vars))))
+      (/ (tellorflex::stake-amount) 10))
   )
 
   (defun get-disputes-by-reporter:[integer] (reporter:string)
