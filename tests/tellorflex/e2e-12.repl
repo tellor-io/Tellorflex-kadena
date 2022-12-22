@@ -1,0 +1,83 @@
+(load "tellorflex-setup.repl")
+
+(env-data {})
+(env-sigs [])
+(env-data {
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" }
+, "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" }
+, "reporter3-keyset": { "keys": [ "reporter3-public-key" ], "pred": "keys-all" }
+, "reporter4-keyset": { "keys": [ "reporter4-public-key" ], "pred": "keys-all" }
+, "reporter5-keyset": { "keys": [ "reporter5-public-key" ], "pred": "keys-all" }
+, "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" }})
+(env-sigs [
+  {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 200.0)]},
+  {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 100.0)]},
+  {"key": "reporter3-keyset", "caps": [(coin.TRANSFER "reporter3-keyset" "tellorflex" 100.0)]},
+  {"key": "reporter4-keyset", "caps": [(coin.TRANSFER "reporter4-keyset" "tellorflex" 100.0)]},
+  {"key": "reporter5-keyset", "caps": [(coin.TRANSFER "reporter5-keyset" "tellorflex" 5000.0)]},
+  {"key": "reporter1-public-key", "caps": []},
+  {"key": "reporter2-public-key", "caps": []},
+  {"key": "reporter3-public-key", "caps": []},
+  {"key": "reporter4-public-key", "caps": []},
+  {"key": "user-public-key", "caps": []},
+  {"key": "reporter5-public-key", "caps": []}])
+
+(begin-tx "rewards go to zero, big reward added, staker stakes")
+
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (free.helpers.precision 100))
+(free.tellorflex.add-staking-rewards "reporter5-keyset" 1000.0)
+(env-chain-data {'block-time: (free.helpers.advanceTime 1)})
+(free.governance-mock.begin-dispute "user-keyset" "" 0)
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (free.helpers.precision 100))
+(commit-tx)
+(env-chain-data {'block-time: (free.helpers.advanceTime (* 86400 40))})
+(begin-tx)
+(free.tellorflex.request-staking-withdraw "reporter1-keyset" (free.helpers.precision 100))
+(commit-tx)
+(env-chain-data {'block-time: (free.helpers.advanceTime (* 86400 40))})
+(begin-tx)
+(let ((before-balance (coin.get-balance "reporter2-keyset")))
+(free.tellorflex.request-staking-withdraw "reporter2-keyset" (free.helpers.precision 100))
+(expect "staker 2 should have an extra 1000 TRB"
+(+ 1000.0 before-balance) (coin.get-balance "reporter2-keyset")))
+(expect "reward rate should be 0" 0 (free.tellorflex.reward-rate))
+(commit-tx)
+(begin-tx)
+(free.tellorflex.add-staking-rewards "reporter5-keyset" 3000.0)
+(free.tellorflex.deposit-stake "reporter3-keyset" (describe-keyset "free.reporter3-keyset") (free.helpers.precision 100))
+(expect "staker 3 should have 0 TRB" 0.0 (coin.get-balance "reporter3-keyset"))
+; advance time
+(env-chain-data {'block-time: (free.helpers.advanceTime (+ 1 (* 86400 10)))})
+(free.tellorflex.deposit-stake "reporter3-keyset" (describe-keyset "free.reporter3-keyset") 0)
+(let ((balanceStaker3 (round (free.helpers.precision (coin.get-balance "reporter3-keyset"))))
+      (expectedBalMin3 (/ (* (free.helpers.precision 3000) 9) 30))
+      (expectedBalMax3 (/ (* (free.helpers.precision 3000) 11) 30)))
+
+    (expect-that "staker 3 should have min TRB" (> balanceStaker3) expectedBalMin3)
+    (expect-that "staker 3 should have max TRB" (< balanceStaker3) expectedBalMax3)
+)
+(commit-tx)
+(begin-tx)
+; advance time
+(env-chain-data {'block-time: (free.helpers.advanceTime 86400)})
+(free.tellorflex.deposit-stake "reporter4-keyset" (describe-keyset "free.reporter4-keyset") (free.helpers.precision 100))
+(expect "staker 4 should have 0 TRB" 0.0 (coin.get-balance "reporter4-keyset"))
+(env-chain-data {'block-time: (free.helpers.advanceTime (* 86400 50))})
+(free.tellorflex.deposit-stake "reporter3-keyset" (describe-keyset "free.reporter3-keyset") 0)
+(commit-tx)
+(begin-tx)
+(free.tellorflex.deposit-stake "reporter4-keyset" (describe-keyset "free.reporter4-keyset") 0)
+(let* ((balanceStaker3 (round (free.helpers.precision (coin.get-balance "reporter3-keyset"))))
+      (balanceStaker4 (round (free.helpers.precision (coin.get-balance "reporter4-keyset"))))
+      (expectedBalMin4 (/ (* (free.helpers.precision 3000) 9) 30))
+      (expectedBalMax4 (/ (* (free.helpers.precision 3000) 11) 30))
+      (expectedBalMin3 (* 2 expectedBalMin4))
+      (expectedBalMax3 (* 2 expectedBalMax4)))
+
+    (expect-that "staker 4 should have min TRB" (> balanceStaker4) expectedBalMin4)
+    (expect-that "staker 4 should have max TRB" (< balanceStaker4) expectedBalMax4)
+    (expect-that "staker 3 should have min TRB" (> balanceStaker3) expectedBalMin3)
+    (expect-that "staker 3 should have max TRB" (< balanceStaker3) expectedBalMax3)
+    (expect "stakers should have 3000 TRB" (round (free.helpers.precision 3000.0)) (+ balanceStaker3 balanceStaker4))
+)
+(expect "reward rate should be 0" 0 (free.tellorflex.reward-rate))

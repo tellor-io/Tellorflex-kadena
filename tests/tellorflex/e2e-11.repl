@@ -1,0 +1,33 @@
+(load "tellorflex-setup.repl")
+
+(env-data {})
+(env-sigs [])
+(env-data {
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" }
+, "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" }
+, "reporter5-keyset": { "keys": [ "reporter5-public-key" ], "pred": "keys-all" }})
+(env-sigs [
+  {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 200.0)]},
+  {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 100.0)]},
+  {"key": "reporter5-keyset", "caps": [(coin.TRANSFER "reporter5-keyset" "tellorflex" 1000.0)]},
+  {"key": "reporter1-public-key", "caps": []},
+  {"key": "reporter2-public-key", "caps": []},
+  {"key": "reporter5-public-key", "caps": []}])
+
+(begin-tx "what happens to staking rewards of non-voter?")
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (free.helpers.precision 100))
+(free.tellorflex.add-staking-rewards "reporter5-keyset" 1000.0)
+(env-chain-data {'block-time: (free.helpers.advanceTime 1)})
+(free.governance-mock.begin-dispute "reporter1-keyset" "" 0)
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (free.helpers.precision 100))
+(env-chain-data {'block-time: (free.helpers.advanceTime (* 86400 40))})
+(commit-tx)
+(begin-tx)
+(free.tellorflex.request-staking-withdraw "reporter1-keyset" (free.helpers.precision 100))
+(commit-tx)
+(begin-tx)
+(env-chain-data {'block-time: (free.helpers.advanceTime (* 86400 40))})
+(let ((before-balance (coin.get-balance "reporter2-keyset")))
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") 0)
+(expect "staker 2 should have an extra 1000 TRB"
+(+ 1000.0 before-balance) (coin.get-balance "reporter2-keyset")))
