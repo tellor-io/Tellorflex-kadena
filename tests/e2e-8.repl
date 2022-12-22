@@ -1,0 +1,60 @@
+(load "tellorflex-setup.repl")
+
+(env-data {})
+(env-sigs [])
+(env-data {
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" },
+  "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 200.0), (coin.TRANSFER "reporter2-keyset" "reporter1-keyset" 800.0)]},
+  {"key": "reporter2-public-key", "caps": []}])
+
+(begin-tx "TBR, stakes, and staking rewards can't borrow from each other")
+(test-capability (coin.COINBASE))
+(test-capability (free.tellorflex.PRIVATE))
+(coin.coinbase "tellorflex" (free.tellorflex.create-guard) 100.0)
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 100 (^ 10 18)))
+(free.tellorflex.add-staking-rewards "reporter2-keyset" 100.0)
+; advance time 16 hour 40minutes = 60000 seconds
+(env-chain-data {'block-time: (free.helpers.advanceTime 60000)})
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "420") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
+(expect "timeBasedRewardsBalance balance should be 0" 0 (free.tellorflex.get-total-time-based-rewards-balance))
+(commit-tx)
+; advance time 16 hour 40minutes = 60000 seconds
+(env-chain-data {'block-time: (free.helpers.advanceTime 60000)})
+(begin-tx)
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "420") 1 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
+(expect "stakingRewardsBalance should be 100" (* 100 (^ 10 18)) (free.tellorflex.staking-rewards-balance))
+(expect "totalStakeAmount should be 100" (* 100 (^ 10 18)) (free.tellorflex.total-stake-amount))
+(test-capability (coin.COINBASE))
+(test-capability (free.tellorflex.PRIVATE))
+(coin.coinbase "tellorflex" (free.tellorflex.create-guard) 100.0)
+; ; advance time 30 days
+(env-chain-data {'block-time: (free.helpers.advanceTime 2712000)})
+(chain-data)
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 5 (^ 10 17)))
+(expect "stakingRewardsBalance should be 0" 0 (free.tellorflex.staking-rewards-balance))
+(commit-tx)
+; advance time 30 days
+(env-chain-data {'block-time: (free.helpers.advanceTime 2712000)})
+(begin-tx)
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 5 (^ 10 17)))
+(expect "timeBasedRewardsBalance balance should be 100" (* 100 (^ 10 18)) (free.tellorflex.get-total-time-based-rewards-balance))
+(expect "totalStakeAmount should be 101" (* 101 (^ 10 18)) (free.tellorflex.total-stake-amount))
+(free.tellorflex.add-staking-rewards "reporter2-keyset" 100.0)
+(commit-tx)
+(begin-tx)
+(env-chain-data {'block-time: (free.helpers.advanceTime 2712000)})
+(free.tellorflex.request-staking-withdraw "reporter2-keyset" (* 101 (^ 10 18)))
+(commit-tx)
+; advance time 7 days
+(env-chain-data {'block-time: (free.helpers.advanceTime 604801)})
+(let((staking-rewards-bal-before (free.tellorflex.staking-rewards-balance)))
+  (begin-tx)
+  (free.tellorflex.withdraw-stake "reporter2-keyset")
+  (commit-tx)
+  (let* ((staking-rewards-bal-after (free.tellorflex.staking-rewards-balance))
+        (loss (- (* 100 (^ 10 18)) staking-rewards-bal-after)))
+        (expect "" (- (* 100 (^ 10 18)) loss) (free.tellorflex.staking-rewards-balance))
+
+    (expect "totalStakeAmount should be 0" 0 (free.tellorflex.total-stake-amount)) ))

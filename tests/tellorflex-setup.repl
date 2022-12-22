@@ -19,8 +19,9 @@
 
 (env-data { "tellor-admin-keyset": { "keys": [ "tellor-keyset-public-key" ], "pred": "keys-all" }, "upgrade": false })
 (env-sigs [{"key": "tellor-keyset-public-key", "caps": []}])
-
 ;  load tellorflex contract
+(env-chain-data {'block-time: (time "2022-12-21T21:26:41Z")})
+
 (begin-tx) ;txn 2
 (load "../i-governance.pact")
 (load "../i-flex.pact")
@@ -68,6 +69,24 @@
 (free.governance.call-tellorflex)
 ; Expect failure when trying to input governance address again
 (expect-failure "row found for key" (free.tellorflex.init "governance place holder"))
+(commit-tx)
+(begin-tx)
+(namespace "free")
+(module helpers "free.tellor-admin-keyset"
+  (defun advanceTime (seconds)
+   (add-time (at 'block-time (chain-data)) seconds)
+  )
+  (defun precision (number)
+    (* number (^ 10 18))
+  )
+  (defun trbPrice (multiplier) (priceConversion (* 50.0 multiplier)))
+  (defun priceConversion (price:decimal)
+    (int-to-str 10 (round (* price (^ 10 18))))
+  )
+  (defun blockTime ()
+    (str-to-int 10 (format-time "%s" (at 'block-time (chain-data))))
+  )
+)
 (commit-tx)
 ;  clear environment metadata
 (env-sigs [])

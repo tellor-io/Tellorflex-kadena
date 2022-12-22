@@ -535,23 +535,31 @@
 
   (defun update-stake-amount ()
     @doc "Updates the stake amount after retrieving the 12 hour old price"
-    (let* ((twelve-hour-price
-      (get-data-before
-        (staking-token-price-query-id)
-        (- (block-time-in-seconds) (reporting-lock)))))
-      (if (= twelve-hour-price {"value": "", "timestamp":0}) "no value"
-      (let* ((twelve-hour-price (get-data-before (staking-token-price-query-id) (- (block-time-in-seconds) (reporting-lock))))
-           (stake-amount (stake-amount))
-           (minimum-stake-amount (minimum-stake-amount))
-           (stake-amount-dollar-target (stake-amount-dollar-target))
-           (price-decoded (str-to-int 10 (base64-decode (at 'value twelve-hour-price))))
-           (adjusted-stake-amount (/ stake-amount-dollar-target price-decoded)))
-           ; TODO: validate price
-        (if (< adjusted-stake-amount minimum-stake-amount)
-          (update global-variables 'global-vars {'stake-amount: minimum-stake-amount})
-          (update global-variables 'global-vars {'stake-amount: adjusted-stake-amount})
-          )
+    (with-default-read timestamps (staking-token-price-query-id)
+      { 'timestamps: [] } { 'timestamps := timestamps }
+      (if (> (length timestamps) 0)
+      (let* ((twelve-hour-price
+        (get-data-before
+          (staking-token-price-query-id)
+          (- (block-time-in-seconds) (reporting-lock)))))
+        (if (= twelve-hour-price {"value": "", "timestamp":0}) "no value"
+        (let* ((twelve-hour-price (get-data-before (staking-token-price-query-id) (- (block-time-in-seconds) (reporting-lock))))
+             (stake-amount (stake-amount))
+             (minimum-stake-amount (minimum-stake-amount))
+             (stake-amount-dollar-target (stake-amount-dollar-target))
+             (price-decoded (str-to-int 10 (base64-decode (at 'value twelve-hour-price))))
+             (adjusted-stake-amount (/ (* stake-amount-dollar-target PRECISION)  price-decoded)))
+            ;   validate price
+          (enforce (and? (<=  (precision 0.01)) (> (precision 1000000.0)) price-decoded)
+           "invalid staking token price")
+          (if (< adjusted-stake-amount minimum-stake-amount)
+            (update global-variables 'global-vars {'stake-amount: minimum-stake-amount})
+            (update global-variables 'global-vars {'stake-amount: adjusted-stake-amount})
+            )
+      )
      )
+    )
+    "no price available"
     )
    )
   )
@@ -600,7 +608,7 @@
 
   (defun get-data-before:object{data-before-return} (query-id:string timestamp:integer)
     @doc "Retrieves the latest value for the queryId before the specified timestamp"
-    (let* ((data-before (try {'value: "", 'timestamp: 0} (data-before query-id timestamp))))
+    (let* ((data-before (data-before query-id timestamp)))
       (if (= {'value: "", 'timestamp: 0} data-before) data-before
       (let* ((timestamp-before (at 'timestamp-before data-before))
              (found (at 'found data-before))
@@ -835,7 +843,7 @@
     (with-read staker-details staker { 'staked-balance := staked-balance , 'reward-debt := reward-debt}
       (update global-variables 'global-vars
       { 'total-stake-amount: (+ (total-stake-amount) staked-balance)
-      , 'total-reward-debt: reward-debt
+      , 'total-reward-debt: (+ (total-reward-debt) reward-debt)
       , 'reward-rate: (if (= (reward-rate) 0) (/ (calculate-reward-rate) THIRTY_DAYS) (reward-rate))
       }))
    )
@@ -900,11 +908,12 @@
        }
        (-
          staking-rewards-balance
-         (/
-           (* accumulated-reward-per-share total-stake-amount)
-           (- PRECISION total-reward-debt)
-         )
-      )
+           (-
+             (/ (* accumulated-reward-per-share total-stake-amount) PRECISION)
+              total-reward-debt
+           )
+       )
+
      )
    )
    (defun to-decimal:decimal (amount:integer)
@@ -939,10 +948,14 @@
    )
 
    (defun accumulated-reward:integer (total-stake-amount:integer total-reward-debt:integer)
-     (/
-       (* (new-accumulated-reward-per-share) total-stake-amount)
-       (- PRECISION total-reward-debt)
+     (- 
+      (/
+       (* (new-accumulated-reward-per-share) total-stake-amount) 
+       PRECISION
       )
+      total-reward-debt
+      )
+
    )
 
    (defun new-accumulated-reward-per-share:integer ()

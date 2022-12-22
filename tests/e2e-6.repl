@@ -7,7 +7,6 @@
 (env-sigs [
   {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 200.0), (coin.TRANSFER "reporter2-keyset" "reporter1-keyset" 800.0)]},
   {"key": "reporter2-public-key", "caps": []}])
-(env-chain-data {'block-time: (time "1970-01-02T00:00:00Z")})
 (begin-tx "TBR + stakes + staking rewards == balanceOf(flexAddress)")
 (test-capability (coin.COINBASE))
 (test-capability (free.tellorflex.PRIVATE))
@@ -23,11 +22,10 @@
 )
 (commit-tx)
 (begin-tx)
-; request-withdraw by 2 10
 (free.tellorflex.request-staking-withdraw "reporter2-keyset" (* 10 (^ 10 18)))
 (commit-tx)
 ; advance time 7 days
-(env-chain-data {'block-time: (time "1970-01-09T00:00:01Z")})
+(env-chain-data {'block-time: (free.helpers.advanceTime 604801)})
 (begin-tx)
 ; withdraw-stake
 (free.tellorflex.withdraw-stake "reporter2-keyset")
