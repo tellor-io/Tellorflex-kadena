@@ -22,7 +22,8 @@ Once the pact interperter is installed you can clone this repo and cd into the t
 git clone https://github.com/tellor-io/Tellorflex-kadena.git
 cd tellorflex-kadena
 pact
-(load "tellorflex.repl" true)
+(load "tests/e2e-1.repl" true)
+<!-- end to end tests are currently being added! -->
 ```
 ## Oracle
 
@@ -33,6 +34,7 @@ Functions included currently:
 - depositStake
 - submitValue
 - retrieveValue
+- getDataBefore
 - requestStakeWithdrawal
 - withdrawStake
 
