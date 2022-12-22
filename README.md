@@ -2,7 +2,7 @@
   <a href='https://www.tellor.io/'>
     <img src= 'https://raw.githubusercontent.com/tellor-io/TellorBrandMaterials/master/Swoosh%20and%20wordmark%20legacy/SwooshWordmarkLegacy.png' width="350" height="250" alt='tellor.io' />
     <img src= 'https://camo.githubusercontent.com/637425cb3d78e55411a0b3cb9ee5684b3a0cbd6d8dc8342c722268f5e4f8b346/68747470733a2f2f692e696d6775722e636f6d2f62415a464147462e706e67' width="250" height="200" alt='tellor.io' />
-    
+
   </a>
 </p>
 
@@ -22,13 +22,13 @@ Once the pact interperter is installed you can clone this repo and cd into the t
 git clone https://github.com/tellor-io/Tellorflex-kadena.git
 cd tellorflex-kadena
 pact
-(load "tests/e2e-1.repl" true)
+(load "tests/tellorflex/tellorflex.repl" true)
 <!-- end to end tests are currently being added! -->
 ```
 ## Oracle
 
 A basic tellor implementation that is still a work in progress.  
-Functions included currently: 
+Functions included currently:
 
 ```cli
 - depositStake
