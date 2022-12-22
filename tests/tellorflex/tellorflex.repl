@@ -69,7 +69,8 @@
   (fold (func) 0 (enumerate 1 20))
 
 )
-(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (* 84600 10)))})
+
+(env-chain-data {'block-time: (free.helpers.advanceTime (* 84600 10))})
 (let ((func (lambda (a b)
   (free.tellorflex.add-staking-rewards "user-keyset" 1.0)
   (begin-tx)
@@ -84,7 +85,7 @@
 
 )
 
-(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (+ 846000 (* 84600 10))))})
+(env-chain-data {'block-time: (free.helpers.advanceTime (* 84600 80))})
 (let ((func (lambda (a b)
   (free.tellorflex.add-staking-rewards "user-keyset" 1.0)
   (begin-tx)
@@ -98,8 +99,8 @@
   (fold (func) 0 (enumerate 1 20))
 
 )
-(format-time "%s" (at 'block-time (chain-data)))
-(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (+ 1692000 (* 84600 60))))})
+
+(env-chain-data {'block-time: (free.helpers.advanceTime (* 84600 80))})
 (let ((func (lambda (a b)
   (let* ((staker-info (free.tellorflex.get-staker-info (+ "reporter" (int-to-str 10 b)) ))
          (stake-balance (at 'staked-balance staker-info)))
@@ -111,8 +112,7 @@
 
 )
 
-(format-time "%s" (at 'block-time (chain-data)))
-(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (+ 6768000 (* 84600 8))))})
+(env-chain-data {'block-time: (free.helpers.advanceTime (* 84600 88))})
 (let ((func (lambda (a b)
   (begin-tx)
   (free.tellorflex.withdraw-stake (+ "reporter" (int-to-str 10 b)) )

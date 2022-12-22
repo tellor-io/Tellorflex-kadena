@@ -9,9 +9,9 @@
 (env-data {})
 
 (begin-tx) ;txn 1
-(load "../root/fungible-v2.pact")
-(load "../root/fungible-xchain-v1.pact")
-(load "../root/coin-v5.pact")
+(load "../../root/fungible-v2.pact")
+(load "../../root/fungible-xchain-v1.pact")
+(load "../../root/coin-v5.pact")
 
 (create-table coin.coin-table)
 (create-table coin.allocation-table)
@@ -23,11 +23,11 @@
 (env-chain-data {'block-time: (time "2022-12-21T21:26:41Z")})
 
 (begin-tx) ;txn 2
-(load "../i-governance.pact")
-(load "../i-flex.pact")
-(load "../tellorflex.pact")
-(load "../governance.pact")
-(load "../testing/governance-mock.pact")
+(load "../../i-governance.pact")
+(load "../../i-flex.pact")
+(load "../../tellorflex.pact")
+(load "../../governance.pact")
+(load "../../testing/governance-mock.pact")
 
 ; tellorflex(oracle) tables
 (create-table tellorflex.global-variables)
@@ -133,9 +133,9 @@
 (test-capability (coin.COINBASE))
 (coin.coinbase "reporter1-keyset" (describe-keyset "free.reporter1-keyset") 1000.0)
 (coin.coinbase "reporter2-keyset" (describe-keyset "free.reporter2-keyset") 1000.0)
-(coin.coinbase "reporter3-keyset" (describe-keyset "free.reporter3-keyset") 1000.0)
-(coin.coinbase "reporter4-keyset" (describe-keyset "free.reporter4-keyset") 1000.0)
-(coin.coinbase "reporter5-keyset" (describe-keyset "free.reporter5-keyset") 1000.0)
+(coin.coinbase "reporter3-keyset" (describe-keyset "free.reporter3-keyset") 100.0)
+(coin.coinbase "reporter4-keyset" (describe-keyset "free.reporter4-keyset") 100.0)
+(coin.coinbase "reporter5-keyset" (describe-keyset "free.reporter5-keyset") 5000.0)
 (coin.coinbase "user-keyset" (describe-keyset "free.user-keyset") 1000.0)
 (commit-tx)
 
