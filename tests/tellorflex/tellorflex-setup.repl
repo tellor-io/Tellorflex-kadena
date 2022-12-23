@@ -72,7 +72,7 @@
 (commit-tx)
 (begin-tx)
 (namespace "free")
-(module helpers "free.tellor-admin-keyset"
+(module h "free.tellor-admin-keyset"
   (defun advanceTime (seconds)
    (add-time (at 'block-time (chain-data)) seconds)
   )

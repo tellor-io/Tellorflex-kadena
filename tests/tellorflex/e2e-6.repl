@@ -25,7 +25,7 @@
 (free.tellorflex.request-staking-withdraw "reporter2-keyset" (* 10 (^ 10 18)))
 (commit-tx)
 ; advance time 7 days
-(env-chain-data {'block-time: (free.helpers.advanceTime 604801)})
+(env-chain-data {'block-time: (free.h.advanceTime 604801)})
 (begin-tx)
 ; withdraw-stake
 (free.tellorflex.withdraw-stake "reporter2-keyset")

@@ -17,12 +17,12 @@
 (free.tellorflex.add-staking-rewards "reporter2-keyset" 100.0)
 (expect "contract balance should be 300.0" 300.0 (coin.get-balance "tellorflex"))
 ; advance time 16 hour 40minutes = 60000 seconds
-(env-chain-data {'block-time: (free.helpers.advanceTime 60000)})
+(env-chain-data {'block-time: (free.h.advanceTime 60000)})
 (free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "420") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
 (expect "contract balance should be 200.0" 200.0 (coin.get-balance "tellorflex"))
 (commit-tx)
 ; advance time 30 days
-(env-chain-data {'block-time: (free.helpers.advanceTime 2592000)})
+(env-chain-data {'block-time: (free.h.advanceTime 2592000)})
 (begin-tx)
 (free.tellorflex.deposit-stake "reporter3-keyset" (describe-keyset "free.reporter3-keyset") (* 100 (^ 10 18)))
 (free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 1 (^ 10 18)))
@@ -35,7 +35,7 @@
 (free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "420") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter3-keyset")
 (expect "contract balance should be 201.0" 201.0 (coin.get-balance "tellorflex"))
 ; advance time 7 days
-(env-chain-data {'block-time: (free.helpers.advanceTime 604801)})
+(env-chain-data {'block-time: (free.h.advanceTime 604801)})
 (free.tellorflex.withdraw-stake "reporter2-keyset")
 (commit-tx)
 (begin-tx)
@@ -44,6 +44,6 @@
 (free.tellorflex.request-staking-withdraw "reporter3-keyset" (* 100 (^ 10 18)))
 (commit-tx)
 ; advance time 7 days
-(env-chain-data {'block-time: (free.helpers.advanceTime 604801)})
+(env-chain-data {'block-time: (free.h.advanceTime 604801)})
 (free.tellorflex.withdraw-stake "reporter3-keyset")
 (expect "contract balance should be 0.0" 0.0 (coin.get-balance "tellorflex"))

@@ -70,7 +70,7 @@
 
 )
 
-(env-chain-data {'block-time: (free.helpers.advanceTime (* 84600 10))})
+(env-chain-data {'block-time: (free.h.advanceTime (* 84600 10))})
 (let ((func (lambda (a b)
   (free.tellorflex.add-staking-rewards "user-keyset" 1.0)
   (begin-tx)
@@ -85,7 +85,7 @@
 
 )
 
-(env-chain-data {'block-time: (free.helpers.advanceTime (* 84600 80))})
+(env-chain-data {'block-time: (free.h.advanceTime (* 84600 80))})
 (let ((func (lambda (a b)
   (free.tellorflex.add-staking-rewards "user-keyset" 1.0)
   (begin-tx)
@@ -100,7 +100,7 @@
 
 )
 
-(env-chain-data {'block-time: (free.helpers.advanceTime (* 84600 80))})
+(env-chain-data {'block-time: (free.h.advanceTime (* 84600 80))})
 (let ((func (lambda (a b)
   (let* ((staker-info (free.tellorflex.get-staker-info (+ "reporter" (int-to-str 10 b)) ))
          (stake-balance (at 'staked-balance staker-info)))
@@ -112,7 +112,7 @@
 
 )
 
-(env-chain-data {'block-time: (free.helpers.advanceTime (* 84600 88))})
+(env-chain-data {'block-time: (free.h.advanceTime (* 84600 88))})
 (let ((func (lambda (a b)
   (begin-tx)
   (free.tellorflex.withdraw-stake (+ "reporter" (int-to-str 10 b)) )
