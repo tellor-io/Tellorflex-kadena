@@ -1,0 +1,112 @@
+(load "tellorflex-setup.repl")
+
+(env-data {})
+(env-sigs [])
+(env-data {
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" },
+  "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" },
+  "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 100.0)]},
+  {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 100.0)]},
+  {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "tellorflex" 1000.0)]},
+  {"key": "reporter1-public-key", "caps": []},
+  {"key": "reporter2-public-key", "caps": []},
+  {"key": "user-public-key", "caps": []}])
+
+(begin-tx "2 reporters stake and unstake with staking rewards")
+; deposit 1st stake
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset")
+  (free.h.precision 100))
+(expect "accumulatedRewardPerShare 0" 0 (free.tellorflex.accumulated-reward-per-share))
+(let ((staker (free.tellorflex.get-staker-info "reporter1-keyset")))
+    (expect "staked balance 10" (free.h.precision 100) (at 'staked-balance staker))
+    (expect "reward-debt 0" 0 (at 'reward-debt staker))
+)
+(expect "totalRewardDebt 0" 0 (free.tellorflex.total-reward-debt))
+; add staking rewards
+(free.tellorflex.add-staking-rewards "user-keyset" 1000.0)
+(let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
+       (expectedRewardRate (/ (free.h.precision 1000) REWARD_RATE_TARGET)))
+       (expect "rewardRate 10" expectedRewardRate (free.tellorflex.reward-rate))
+)
+(expect "accumulatedRewardPerShare 0" 0 (free.tellorflex.accumulated-reward-per-share))
+(expect "totalRewardDebt 0" 0 (free.tellorflex.total-reward-debt))
+(env-chain-data {'block-time: (free.h.advanceTime 2)})
+; deposit 2nd stake
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset")
+  (free.h.precision 100))
+(let* ((blocktime-diff 2)
+      (expectedRewardRate (/ (free.h.precision 1000) (fold (*) 60 [60 24 30])))
+      (expectedAccumulatedRewardPerShare (/(* blocktime-diff expectedRewardRate) 100)))
+    (expect "accumulatedRewardPerShare should be correct" expectedAccumulatedRewardPerShare
+      (free.tellorflex.accumulated-reward-per-share))
+  (let ((expectedRewardDebt (* 100 expectedAccumulatedRewardPerShare))
+        (staker (free.tellorflex.get-staker-info "reporter2-keyset")))
+      (expect "staked balance 10" (free.h.precision 100) (at 'staked-balance staker))
+      (expect "rewardDebt should be correct"
+        expectedRewardDebt (at 'reward-debt staker))
+      (expect "totalRewardDebt should be correct"
+        expectedRewardDebt (free.tellorflex.total-reward-debt))
+  )
+)
+(env-chain-data {'block-time: (free.h.advanceTime 86400)})
+; request-withdraw
+(free.tellorflex.request-staking-withdraw "reporter1-keyset" (free.h.precision 100))
+(commit-tx)
+(let* ((blocktime-diff0 2)
+      (blocktime-diff1 86400)
+      (expectedRewardRate (/ (free.h.precision 1000) (fold (*) 60 [60 24 30])))
+      (expectedAccumulatedRewardPerShare0 (/(* blocktime-diff0 expectedRewardRate) 100))
+      (expectedAccumulatedRewardPerShare1
+        (+ expectedAccumulatedRewardPerShare0(/(* blocktime-diff1 expectedRewardRate) 200))))
+    (expect "accumulatedRewardPerShare should be correct" expectedAccumulatedRewardPerShare1
+      (free.tellorflex.accumulated-reward-per-share))
+    (expect ""
+      (* expectedAccumulatedRewardPerShare1 100)
+      (round (free.h.precision (- (coin.get-balance "reporter1-keyset") 900.0))))
+  (let ((expectedRewardDebt (* 100 expectedAccumulatedRewardPerShare0))
+        (staker (free.tellorflex.get-staker-info "reporter1-keyset")))
+      (expect "staked balance" 0 (at 'staked-balance staker))
+      (expect "rewardDebt should be correct" 0 (at 'reward-debt staker))
+      (expect "totalRewardDebt should be correct"
+        expectedRewardDebt (free.tellorflex.total-reward-debt))
+  )
+)
+(begin-tx)
+(env-chain-data {'block-time: (free.h.advanceTime 1)})
+; request-withdraw 2nd stake
+(free.tellorflex.request-staking-withdraw "reporter2-keyset" (free.h.precision 100))
+(commit-tx)
+(let* ((blocktime-diff0 2)
+      (blocktime-diff1 86400)
+      (blocktime-diff2 1)
+      (expectedRewardRate (/ (free.h.precision 1000) (fold (*) 60 [60 24 30])))
+      (expectedAccumulatedRewardPerShare0 (/(* blocktime-diff0 expectedRewardRate) 100))
+      (expectedAccumulatedRewardPerShare1
+        (+ expectedAccumulatedRewardPerShare0(/(* blocktime-diff1 expectedRewardRate) 200)))
+      (expectedAccumulatedRewardPerShare2
+        (+ expectedAccumulatedRewardPerShare1 (/(* blocktime-diff2 expectedRewardRate) 100))))
+    (expect "accumulatedRewardPerShare should be correct" expectedAccumulatedRewardPerShare2
+      (free.tellorflex.accumulated-reward-per-share))
+  (let ((expectedRewardDebt (* 100 expectedAccumulatedRewardPerShare0))
+        (staker (free.tellorflex.get-staker-info "reporter1-keyset")))
+      (expect ""
+        (- (* expectedAccumulatedRewardPerShare2 100) expectedRewardDebt)
+        (round (free.h.precision (- (coin.get-balance "reporter2-keyset") 900.0))))
+      (expect "staked balance" 0 (at 'staked-balance staker))
+      (expect "rewardDebt should be correct" 0 (at 'reward-debt staker))
+      (expect "totalRewardDebt should be correct" 0 (free.tellorflex.total-reward-debt))
+  )
+)
+(env-chain-data {'block-time: (free.h.advanceTime (+ 1 (* 86400 7)))})
+; fully withdraw both stakes
+(let ((staker1BalanceBefore (coin.get-balance "reporter1-keyset"))
+      (staker2BalanceBefore (coin.get-balance "reporter2-keyset")))
+    (begin-tx)
+    (free.tellorflex.withdraw-stake "reporter1-keyset")
+    (commit-tx)
+    (free.tellorflex.withdraw-stake "reporter2-keyset")
+  (expect "staker balance should be correct" (+ 100 staker1BalanceBefore) (coin.get-balance "reporter1-keyset"))
+  (expect "staker balance should be correct" (+ 100 staker2BalanceBefore) (coin.get-balance "reporter2-keyset"))
+)

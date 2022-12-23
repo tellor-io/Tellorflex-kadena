@@ -1,0 +1,179 @@
+(load "tellorflex-setup.repl")
+
+(env-data {})
+(env-sigs [])
+(env-data {
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" },
+  "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 300.0)]},
+  {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "tellorflex" 1000.0)]},
+  {"key": "reporter1-public-key", "caps": []}, {"key": "user-public-key", "caps": []}])
+
+(begin-tx "Realistic test with staking rewards and disputes")
+(test-capability (coin.COINBASE))
+(test-capability (free.tellorflex.PRIVATE))
+(coin.coinbase "tellorflex" (free.tellorflex.create-guard) 1000.0)
+; check initial conditions
+(expect "stakingRewardsBalance 0" 0 (free.tellorflex.staking-rewards-balance))
+(expect "rewardRate 0" 0 (free.tellorflex.reward-rate))
+; add staking rewards
+(free.tellorflex.add-staking-rewards "user-keyset" 1000.0)
+; check conditions after adding rewards
+(expect "stakingRewardsBalance 1000" (free.h.precision 1000) (free.tellorflex.staking-rewards-balance))
+(expect "totalRewardDebt 0" 0 (free.tellorflex.total-reward-debt))
+(let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
+       (expectedRewardRate (/ (free.h.precision 1000) REWARD_RATE_TARGET)))
+       (expect "rewardRate 10" expectedRewardRate (free.tellorflex.reward-rate))
+)
+; create 2 mock disputes, vote once
+(free.governance-mock.begin-dispute "user" "" 0)
+(free.governance-mock.begin-dispute "user" "" 0)
+(free.governance-mock.vote 1 false false "reporter1-keyset")
+; deposit stake
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (free.h.precision 10))
+; check conditions after depositing stake
+(expect "stakingRewardsBalance 1000" (free.h.precision 1000)
+  (free.tellorflex.staking-rewards-balance))
+(expect "getTotalStakeAmount 10" (free.h.precision 10)
+  (free.tellorflex.total-stake-amount))
+(expect "totalRewardDebt 0" 0 (free.tellorflex.total-reward-debt))
+(expect "accumulatedRewardPerShare 0" 0
+  (free.tellorflex.accumulated-reward-per-share))
+(expect "timeOfLastAllocation current time" (free.h.blockTime)
+  (free.tellorflex.time-of-last-allocation))
+(let ((staker-info (free.tellorflex.get-staker-info "reporter1-keyset")))
+    (expect "stakedBalance 10" (free.h.precision 10) (at 'staked-balance staker-info))
+    (expect "rewardDebt 0" 0  (at 'reward-debt staker-info))
+    (expect "startVoteCount 2" 2 (at 'start-vote-count staker-info))
+    (expect "start-vote-tally 1" 1 (at 'start-vote-tally staker-info))
+)
+; advance time
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 10))})
+(format-time "%s" (at 'block-time (chain-data)))
+
+(expect "token balance 990" 990.0 (coin.get-balance "reporter1-keyset"))
+; deposit 0 stake, update rewards
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") 0)
+; check conditions after updating rewards
+(expect "timeOfLastAllocation current time" (free.h.blockTime)
+  (free.tellorflex.time-of-last-allocation))
+(let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
+       (expectedRewardRate (/ (free.h.precision 1000) REWARD_RATE_TARGET)))
+       (expect "rewardRate expectedRewardRate" expectedRewardRate (free.tellorflex.reward-rate))
+
+(let* ((block0 1671658001)
+       (block1 (free.h.blockTime))
+       (expectedAccumulatedRewardPerShare
+          (/ (* (- block1 block0) expectedRewardRate) 10) )
+       (expectedBalance
+         (+ (/
+           (* (free.h.precision 10) expectedAccumulatedRewardPerShare)
+           (free.h.precision 1)) (free.h.precision 990))))
+       (expect "reporter 1 token balance is expectedBalance"
+        expectedBalance (round (free.h.precision (coin.get-balance "reporter1-keyset"))))
+       (expect "accumulatedRewardPerShare expectedAccumulatedRewardPerShare"
+        expectedAccumulatedRewardPerShare (free.tellorflex.accumulated-reward-per-share))
+       (expect "totalRewardDebt 0" (- expectedBalance (free.h.precision 990))
+        (free.tellorflex.total-reward-debt))
+
+  (let ((staker-info (free.tellorflex.get-staker-info "reporter1-keyset")))
+      (expect "stakedBalance 10" (free.h.precision 10) (at 'staked-balance staker-info))
+      (expect "rewardDebt 10" (- expectedBalance (free.h.precision 990))  (at 'reward-debt staker-info))
+      (expect "startVoteCount 2" 2 (at 'start-vote-count staker-info))
+      (expect "start-vote-tally 1" 1 (at 'start-vote-tally staker-info))
+  )
+)
+)
+
+; start a dispute
+(free.governance-mock.begin-dispute "user" "" 0)
+(commit-tx)
+(begin-tx)
+
+; advance time
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 10))})
+; deposit 0 stake, update rewards
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") 0)
+; check conditions after updating rewards
+(expect "timeOfLastAllocation current time" (free.h.blockTime)
+  (free.tellorflex.time-of-last-allocation))
+(let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
+       (expectedRewardRate (/ (free.h.precision 1000) REWARD_RATE_TARGET)))
+       (expect "rewardRate expectedRewardRate" expectedRewardRate (free.tellorflex.reward-rate))
+
+    (let* ((block0 1671658001)
+           (block1 1672522001)
+           (block2 (free.h.blockTime))
+           (expectedAccumulatedRewardPerShare (/ (* (- block1 block0) expectedRewardRate) 10))
+           (expectedAccumulatedUpdated
+             (+ expectedAccumulatedRewardPerShare
+               (/ (* (- block2 block1) expectedRewardRate) 10)))
+           (expectedRewardDebt (* expectedAccumulatedUpdated 10))
+           (expectedBalance
+             (+ (/
+               (* (free.h.precision 10) expectedAccumulatedRewardPerShare)
+               (free.h.precision 1)) (free.h.precision 990))))
+          (expect "staker token balance should be expectedBalance"
+            expectedBalance (round (free.h.precision (coin.get-balance "reporter1-keyset"))))
+          (expect "accumulatedRewardPerShare expectedAccumulatedUpdated"
+            expectedAccumulatedUpdated (free.tellorflex.accumulated-reward-per-share))
+          (expect "totalRewardDebt expectedRewardDebt" expectedRewardDebt
+           (free.tellorflex.total-reward-debt))
+
+       (let ((staker-info (free.tellorflex.get-staker-info "reporter1-keyset")))
+           (expect "stakedBalance 10" (free.h.precision 10) (at 'staked-balance staker-info))
+           (expect "rewardDebt expectedRewardDebt" expectedRewardDebt  (at 'reward-debt staker-info))
+           (expect "startVoteCount 2" 2 (at 'start-vote-count staker-info))
+           (expect "start-vote-tally 1" 1 (at 'start-vote-tally staker-info))
+       )
+      )
+)
+; start a dispute and vote
+(free.governance-mock.begin-dispute "user" "" 0)
+(free.governance-mock.vote 4 false false "reporter1-keyset")
+(commit-tx)
+(begin-tx)
+(env-chain-data {'block-time: (free.h.advanceTime (+ 3(* 86400 5)))})
+; deposit 0 stake, update rewards
+(free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") 0)
+; check conditions after updating rewards
+(expect "timeOfLastAllocation current time" (free.h.blockTime)
+  (free.tellorflex.time-of-last-allocation))
+(let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
+       (expectedRewardRate (/ (free.h.precision 1000) REWARD_RATE_TARGET)))
+       (expect "rewardRate expectedRewardRate" expectedRewardRate (free.tellorflex.reward-rate))
+
+    (let* ((block0 1671658001)
+           (block1 1672522001)
+           (block2 1673386001)
+           (block3 (free.h.blockTime))
+           (expectedAccumulatedRewardPerShare (/ (* (- block1 block0) expectedRewardRate) 10))
+           (expectedAccumulatedUpdated
+             (+ expectedAccumulatedRewardPerShare
+               (/ (* (- block2 block1) expectedRewardRate) 10)))
+           (expectedAccumulatedUpdated2 (+ expectedAccumulatedUpdated
+             (/ (* (- block3 block2) expectedRewardRate) 10)))
+           (expectedRewardDebt (* expectedAccumulatedUpdated 10))
+           (expectedBalance
+             (+ (/
+               (* (free.h.precision 10) expectedAccumulatedRewardPerShare)
+               (free.h.precision 1)) (free.h.precision 990)))
+           (expectedBalance2 (+ expectedBalance
+             (/ (- (* expectedAccumulatedUpdated2 10) expectedRewardDebt) 2)))
+            (expectedRewardDebt2 (* 10 expectedAccumulatedUpdated2)))
+          (expect "staker token balance should be expectedBalance"
+            expectedBalance2 (round (free.h.precision (coin.get-balance "reporter1-keyset"))))
+          (expect "accumulatedRewardPerShare expectedAccumulatedUpdated"
+            expectedAccumulatedUpdated2 (free.tellorflex.accumulated-reward-per-share))
+          (expect "totalRewardDebt expectedRewardDebt2" expectedRewardDebt2
+           (free.tellorflex.total-reward-debt))
+
+       (let ((staker-info (free.tellorflex.get-staker-info "reporter1-keyset")))
+           (expect "stakedBalance 10" (free.h.precision 10) (at 'staked-balance staker-info))
+           (expect "rewardDebt expectedRewardDebt2" expectedRewardDebt2  (at 'reward-debt staker-info))
+           (expect "startVoteCount 2" 2 (at 'start-vote-count staker-info))
+           (expect "start-vote-tally 1" 1 (at 'start-vote-tally staker-info))
+       )
+      )
+)

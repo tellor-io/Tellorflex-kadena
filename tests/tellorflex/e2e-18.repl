@@ -1,0 +1,33 @@
+(load "tellorflex-setup.repl")
+
+(env-data {})
+(env-sigs [])
+(env-data {
+  "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "tellorflex" 1000.0)]},
+  {"key": "user-public-key", "caps": []}])
+
+(begin-tx "Time based rewards don't steal from stakes pending withdrawal")
+(free.tellorflex.deposit-stake "user-keyset" (describe-keyset "free.user-keyset")
+  (free.h.precision 1000))
+(expect "total time based rewards balance should be 0" 0
+  (free.tellorflex.get-total-time-based-rewards-balance))
+(expect "toWithdraw should be 0" 0
+  (free.tellorflex.to-withdraw))
+(free.tellorflex.request-staking-withdraw "user-keyset" (free.h.precision 100))
+(expect "total time based rewards balance should be 0" 0
+  (free.tellorflex.get-total-time-based-rewards-balance))
+(expect "toWithdraw should be correct" (free.h.precision 100)
+  (free.tellorflex.to-withdraw))
+(commit-tx)
+(begin-tx)
+(free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (base64-encode (free.h.priceConversion 1000.0)) 0
+  (base64-encode "{SpotPrice: [eth,usd]}") "user-keyset")
+(test-capability (free.governance.PRIVATE))
+(free.tellorflex.slash-reporter "user-keyset" "reporter2-keyset")
+(expect "total time based rewards balance should be 0" 0
+  (free.tellorflex.get-total-time-based-rewards-balance))
+(expect "toWithdraw should be 0" 0
+  (free.tellorflex.to-withdraw))

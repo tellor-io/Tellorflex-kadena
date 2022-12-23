@@ -1,0 +1,47 @@
+(load "tellorflex-setup.repl")
+
+(env-data {})
+(env-sigs [])
+(env-data {
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" },
+  "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" },
+  "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 100.0)]},
+  {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 20.0)]},
+  {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "tellorflex" 1000.0)]},
+  {"key": "reporter1-public-key", "caps": []},
+  {"key": "reporter2-public-key", "caps": []},
+  {"key": "user-public-key", "caps": []}])
+
+(begin-tx "open dispute A when reporter stakes, reporter votes on A and one more B")
+; create 2 disputes
+(free.governance-mock.begin-dispute "user" "" 0)
+(free.governance-mock.begin-dispute "user" "" 0)
+; vote on one dispute
+(free.governance-mock.vote 1 false false "reporter2-keyset")
+; deposit stake
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (free.h.precision 10))
+(let ((staker (free.tellorflex.get-staker-info "reporter2-keyset")))
+    (expect "staked balance 10" (free.h.precision 10) (at 'staked-balance staker))
+    (expect "start vote count 2" 2 (at 'start-vote-count staker))
+    (expect "start vote tally 1" 1 (at 'start-vote-tally staker))
+)
+; start a dispute
+(free.governance-mock.begin-dispute "user" "" 0)
+; vote
+(free.governance-mock.vote 2 false false "reporter2-keyset")
+(free.governance-mock.vote 3 false false "reporter2-keyset")
+; add staking rewards
+(free.tellorflex.add-staking-rewards "user-keyset" 1000.0)
+; advance time
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 31))})
+; request-withdraw
+(free.tellorflex.request-staking-withdraw "reporter2-keyset" (free.h.precision 10))
+(commit-tx)
+(begin-tx)
+; advance time 7 days
+(env-chain-data {'block-time: (free.h.advanceTime (+ 1 (* 86400 7)))})
+; withdraw
+(free.tellorflex.withdraw-stake "reporter2-keyset")
+(expect "Token balance should be an extra 1000" 2000.0 (coin.get-balance "reporter2-keyset"))
