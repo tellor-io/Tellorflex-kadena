@@ -623,7 +623,7 @@
     )
   )
 
-  (defun get-new-value-countby-query-id:integer (query-id:string)
+  (defun get-new-value-count-by-query-id:integer (query-id:string)
     @doc "Get the number of values submitted for a query id"
     (let ((timestamps (at 'timestamps (read timestamps query-id))))
       (length timestamps) )
@@ -948,9 +948,9 @@
    )
 
    (defun accumulated-reward:integer (total-stake-amount:integer total-reward-debt:integer)
-     (- 
+     (-
       (/
-       (* (new-accumulated-reward-per-share) total-stake-amount) 
+       (* (new-accumulated-reward-per-share) total-stake-amount)
        PRECISION
       )
       total-reward-debt
