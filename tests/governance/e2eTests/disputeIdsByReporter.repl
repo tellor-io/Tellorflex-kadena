@@ -1,0 +1,87 @@
+(load "../governance-setup.repl")
+
+(env-sigs [])
+(env-data {})
+(env-data {
+  "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" },
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" },
+  "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "governance" 300.0)]},
+  {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 300.0)]},
+  {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 100.0),(coin.TRANSFER "reporter2-keyset" "governance" 100.0)]},
+  {"key": "user-public-key", "caps": []},
+  {"key": "reporter1-public-key", "caps": []},
+  {"key": "reporter2-public-key", "caps": []}])
+
+(begin-tx "Test array of dispute ids by reporter address")
+(free.tellorflex.deposit-stake
+  "reporter1-keyset"
+  (describe-keyset "free.reporter1-keyset")
+  (free.h.precision 20))
+(free.tellorflex.deposit-stake
+  "reporter2-keyset"
+  (describe-keyset "free.reporter2-keyset")
+  (free.h.precision 20))
+
+(free.tellorflex.submit-value
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (base64-encode (free.h.priceConversion 100.0)) 0
+  (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+(env-chain-data {'block-time: (free.h.advanceTime 1)})
+(free.tellorflex.submit-value
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (base64-encode (free.h.priceConversion 200.0)) 0
+  (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
+(free.governance.begin-dispute
+  "user-keyset"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (- (free.h.blockTime) 1))
+
+(let* ((reporter-disputes
+        (free.governance.get-disputes-by-reporter "reporter1-keyset"))
+       (dispute-ids (at 'dispute-ids reporter-disputes)))
+     (expect "Should be one dispute id" 1 (length dispute-ids))
+     (expect  "Dispute id should be correct" 1 (at 0 dispute-ids))
+)
+(expect-failure "row not found: reporter2-keyset"
+  (free.governance.get-disputes-by-reporter "reporter2-keyset"))
+(commit-tx)
+(begin-tx)
+(free.governance.begin-dispute
+  "user-keyset"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (free.h.blockTime))
+(let* ((reporter-disputes
+        (free.governance.get-disputes-by-reporter "reporter2-keyset"))
+       (dispute-ids (at 'dispute-ids reporter-disputes)))
+     (expect "Should be one dispute id" 1 (length dispute-ids))
+     (expect  "Dispute id should be correct" 2 (at 0 dispute-ids))
+)
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 2))})
+(free.governance.tally-votes 1)
+(commit-tx)
+(begin-tx)
+(free.governance.begin-dispute
+  "user-keyset"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (- (- (free.h.blockTime) (* 86400 2)) 1))
+
+(let* ((reporter-disputes
+        (free.governance.get-disputes-by-reporter "reporter1-keyset"))
+      (dispute-ids (at 'dispute-ids reporter-disputes)))
+     (expect "Should be one dispute id" 2 (length dispute-ids))
+     (expect  "Dispute id should be correct" 1 (at 0 dispute-ids))
+     (expect  "Dispute id should be correct" 3 (at 1 dispute-ids))
+)
+(env-chain-data {'block-time: (free.h.advanceTime 3)})
+(free.tellorflex.submit-value
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (base64-encode (free.h.priceConversion 300.0)) 0
+  (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
+(commit-tx)
+(begin-tx)
+(free.governance.begin-dispute
+  "user-keyset"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (free.h.blockTime))

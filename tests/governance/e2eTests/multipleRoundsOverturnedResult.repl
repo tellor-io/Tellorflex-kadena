@@ -1,0 +1,74 @@
+(load "../governance-setup.repl")
+
+(env-sigs [])
+(env-data {})
+(env-data {
+  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" },
+  "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "governance" 300.0)]},
+  {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 300.0)]},
+  {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 100.0),(coin.TRANSFER "reporter2-keyset" "governance" 100.0)]},
+  {"key": "reporter1-public-key", "caps": []},
+  {"key": "reporter2-public-key", "caps": []}])
+
+(begin-tx "Test multiple vote rounds on a dispute, overturn result")
+(free.tellorflex.deposit-stake
+  "reporter1-keyset"
+  (describe-keyset "free.reporter1-keyset")
+  (free.h.precision 10))
+
+(free.tellorflex.submit-value
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (base64-encode (free.h.priceConversion 100.0)) 0
+  (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+(commit-tx)
+; round 1
+(begin-tx)
+(free.governance.begin-dispute
+  "reporter2-keyset"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (free.h.blockTime))
+(commit-tx)
+(begin-tx)
+(free.governance.vote 1 true false "reporter1-keyset")
+(free.governance.vote 1 true false "reporter2-keyset")
+; advance time
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 2))})
+(free.governance.tally-votes 1)
+(commit-tx)
+; round 2
+(begin-tx)
+(free.governance.begin-dispute
+  "reporter2-keyset"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (- (free.h.blockTime) (* 86400 2)))
+(free.governance.vote 2 true false "reporter1-keyset")
+(free.governance.vote 2 true false "reporter2-keyset")
+; advance time
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 4))})
+(free.governance.tally-votes 2)
+; round 3
+(free.governance.begin-dispute
+  "reporter2-keyset"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (- (free.h.blockTime) (* 86400 6)))
+(free.governance.vote 3 false false "reporter1-keyset")
+(free.governance.vote 3 false false "reporter2-keyset")
+; advance time
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 6))})
+(free.governance.tally-votes 3)
+; execute
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 3))})
+(let ((voter1-bal (coin.get-balance "reporter1-keyset"))
+      (voter2-bal (coin.get-balance "reporter2-keyset"))
+      (balance-gov (coin.get-balance "governance")))
+
+  (expect-failure "Must be the final vote" (free.governance.execute-vote 1))
+  (expect-failure "Must be the final vote" (free.governance.execute-vote 2))
+  (free.governance.execute-vote 3)
+  (expect-failure "Vote has already been executed" (free.governance.execute-vote 3))
+  (expect "" (+ 17.0 voter1-bal) (coin.get-balance "reporter1-keyset"))
+  (expect "" voter2-bal (coin.get-balance "reporter2-keyset"))
+  (expect "" (- balance-gov 17.0) (coin.get-balance "governance"))
+  (expect "failed" "FAILED" (at 'result (free.governance.get-vote-info 3))))

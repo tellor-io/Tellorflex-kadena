@@ -1,0 +1,141 @@
+(load "../governance-setup.repl")
+(env-data {
+  "account0": { "keys": [ "account0-public-key" ], "pred": "keys-all" },
+  "account10": { "keys": [ "account10-public-key" ], "pred": "keys-all" },
+  "account1": { "keys": [ "account1-public-key" ], "pred": "keys-all" },
+  "account2": { "keys": [ "account2-public-key" ], "pred": "keys-all" },
+  "account3": { "keys": [ "account3-public-key" ], "pred": "keys-all" },
+  "account4": { "keys": [ "account4-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+  {"key": "account10", "caps": [(coin.TRANSFER "account10" "tellorflex" 40.0)]},
+  {"key": "account0", "caps": [(coin.TRANSFER "account0" "governance" 10.0)]},
+  {"key": "account1", "caps": [(coin.TRANSFER "account1" "governance" 1.0)]},
+  {"key": "account2", "caps": [(coin.TRANSFER "account2" "governance" 2.0)]},
+  {"key": "account3", "caps": [(coin.TRANSFER "account3" "governance" 3.0)]},
+  {"key": "account4", "caps": [(coin.TRANSFER "account4" "governance" 1.0)]},
+  {"key": "account10-public-key", "caps": []},
+  {"key": "account0-public-key", "caps": []},
+  {"key": "account1-public-key", "caps": []},
+  {"key": "account2-public-key", "caps": []},
+  {"key": "account3-public-key", "caps": []},
+  {"key": "account4-public-key", "caps": []}])
+(begin-tx)
+(namespace "free")
+(define-keyset "free.account10" (read-keyset "account10"))
+(define-keyset "free.account0" (read-keyset "account0"))
+(define-keyset "free.account1" (read-keyset "account1"))
+(define-keyset "free.account2" (read-keyset "account2"))
+(define-keyset "free.account3" (read-keyset "account3"))
+(define-keyset "free.account4" (read-keyset "account4"))
+(commit-tx)
+(begin-tx)
+(coin.create-account "account10" (describe-keyset "free.account10"))
+(coin.create-account "account0" (describe-keyset "free.account0"))
+(coin.create-account "account1" (describe-keyset "free.account1"))
+(coin.create-account "account2" (describe-keyset "free.account2"))
+(coin.create-account "account3" (describe-keyset "free.account3"))
+(coin.create-account "account4" (describe-keyset "free.account4"))
+
+(test-capability (coin.COINBASE))
+(coin.coinbase "account10" (describe-keyset "free.account10") 40.0)
+(coin.coinbase "account0" (describe-keyset "free.account0") 100.0)
+(coin.coinbase "account1" (describe-keyset "free.account1") 1.0)
+(coin.coinbase "account2" (describe-keyset "free.account2") 2.0)
+(coin.coinbase "account3" (describe-keyset "free.account3") 3.0)
+(coin.coinbase "account4" (describe-keyset "free.account4") 1.0)
+(commit-tx)
+(begin-tx "test vote weight outcomes")
+(free.tellorflex.deposit-stake
+  "account10"
+  (describe-keyset "free.account10")
+  (free.h.precision 40))
+(free.tellorflex.submit-value
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (base64-encode (free.h.priceConversion 100.0)) 0
+  (base64-encode "{SpotPrice: [eth,usd]}")  "account10")
+(commit-tx)
+(begin-tx)
+(free.governance.begin-dispute
+  "account0"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (free.h.blockTime))
+(commit-tx)
+(begin-tx)
+(free.governance.vote 1 true false "account3")
+(commit-tx)
+(begin-tx)
+(free.governance.vote 1 false false "account4")
+(commit-tx)
+(begin-tx)
+(free.governance.vote 1 false true "account1")
+(commit-tx)
+(begin-tx)
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 2))})
+(free.governance.tally-votes 1)
+(expect "should be support" "PASSED" (at 'result (free.governance.get-vote-info 1)))
+
+(free.tellorflex.submit-value
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (base64-encode (free.h.priceConversion 100.0)) 0
+  (base64-encode "{SpotPrice: [eth,usd]}")  "account10")
+(free.governance.begin-dispute
+  "account0"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (free.h.blockTime))
+(commit-tx)
+(begin-tx)
+(free.governance.vote 2 true false "account4")
+(commit-tx)
+(begin-tx)
+(free.governance.vote 2 false false "account3")
+(commit-tx)
+(begin-tx)
+(free.governance.vote 2 false true "account1")
+(commit-tx)
+(begin-tx)
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 2))})
+(free.governance.tally-votes 2)
+(expect "should be failed" "FAILED" (at 'result (free.governance.get-vote-info 2)))
+(free.tellorflex.submit-value
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (base64-encode (free.h.priceConversion 100.0)) 0
+  (base64-encode "{SpotPrice: [eth,usd]}")  "account10")
+(free.governance.begin-dispute
+  "account0"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (free.h.blockTime))
+(commit-tx)
+(begin-tx)
+(free.governance.vote 3 true false "account2")
+(commit-tx)
+(begin-tx)
+(free.governance.vote 3 false false "account4")
+(commit-tx)
+(begin-tx)
+(free.governance.vote 3 false true "account1")
+(commit-tx)
+(begin-tx)
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 2))})
+(free.governance.tally-votes 3)
+(expect "should be invalid" "INVALID" (at 'result (free.governance.get-vote-info 3)))
+(free.tellorflex.submit-value
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (base64-encode (free.h.priceConversion 100.0)) 0
+  (base64-encode "{SpotPrice: [eth,usd]}")  "account10")
+(free.governance.begin-dispute
+  "account0"
+  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+  (free.h.blockTime))
+(commit-tx)
+(begin-tx)
+(free.governance.vote 4 true false "account4")
+(commit-tx)
+(begin-tx)
+(free.governance.vote 4 false true "account2")
+(commit-tx)
+(begin-tx)
+(free.governance.vote 4 false true "account1")
+(commit-tx)
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 2))})
+(free.governance.tally-votes 4)
+(expect "should be invalid" "INVALID" (at 'result (free.governance.get-vote-info 4)))
