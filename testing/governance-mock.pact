@@ -12,10 +12,21 @@
 (module governance-mock TELLOR-GOV
   (implements i-governance)
 
+  (defcap PRIVATE () true )
+
+  (defun private:bool () (require-capability (PRIVATE)) )
+
   (defcap TELLOR-GOV ()
     (enforce-guard (keyset-ref-guard "free.tellor-admin-keyset"))
   )
 
+  (defun call-tellorflex ()
+    (let ((tellorflex:module{i-flex} (at 'oracle (read global 'global))))
+      (with-capability (TELLOR-GOV)
+        (tellorflex::init-gov-guard (create-user-guard (private)))
+      )
+    )
+  )
 
   (defschema global-schema
     oracle:module{i-flex}

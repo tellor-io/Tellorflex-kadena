@@ -1,14 +1,7 @@
 ; tellorflex on kadena
 (namespace "free")
 
-(if (read-msg "upgrade")
-  "Upgrading contract"
 
-  [
-    (enforce-keyset (read-keyset "tellor-admin-keyset"))
-    (define-keyset "free.tellor-admin-keyset" (read-keyset "tellor-admin-keyset"))
-  ]
-)
 (module tellorflex TELLOR
 
 
@@ -259,9 +252,8 @@
         )
       )
 
-      (token::create-account TELLOR_FLEX_ACCOUNT (create-guard)
-
-      )"Global variables set!"
+      (token::create-account TELLOR_FLEX_ACCOUNT (create-guard))
+      "Global variables set!"
     )
   )
 
@@ -373,14 +365,30 @@
     )
   )
 
-  (defun remove-value (query-id:string timestamp:integer)
+  (defun remove-value:string (query-id:string timestamp:integer)
     @doc "Remove disputed value only by governance"
     (with-capability (GOV_GUARD)
-    (let ((is-in-dispute (is-in-dispute query-id timestamp)))
-      (enforce (not is-in-dispute) "Value already disputed"))
-      (update reports (concatenate query-id timestamp)
-        { 'value: "" , 'is-disputed: true })
-    )
+      (let ((is-in-dispute (is-in-dispute query-id timestamp))
+            (idx (get-timestamp-index-by-timestamp query-id timestamp)))
+
+          (enforce (not is-in-dispute) "Value already disputed")
+          (update reports (concatenate query-id timestamp)
+            { 'value: "" , 'is-disputed: true })
+          (with-read timestamps query-id { 'timestamps := timestamps-lis }
+            (update timestamps query-id
+              { 'timestamps:
+                (+
+                  (+
+                    (take idx timestamps-lis)
+                    [{'timestamp: timestamp, 'disputed: true}]
+                  )
+                  (drop (+ 1 idx) timestamps-lis)
+                )
+              }
+            )
+          )
+      )
+    ) (format "value for {} at {} removed" [query-id timestamp])
   )
 
   (defun request-staking-withdraw (staker:string amount:integer)
@@ -405,48 +413,57 @@
     )
   )
 
-  (defun slash-reporter (reporter:string recipient:string)
+  (defun slash-reporter:integer (reporter:string recipient:string)
+    (with-capability (GOV_GUARD)
       (with-read staker-details reporter
         { 'staked-balance := staked-balance ,'locked-balance := locked-balance }
         (enforce (> (+ staked-balance locked-balance) 0) "Zero staker balance")
         (let* ((token:module{fungible-v2} (token))
                (stake-amount (stake-amount))
                (to-withdraw (to-withdraw))
-               (slash-amount (if
-                 (or
-                   (>= locked-balance stake-amount)
-                   (>= (+ locked-balance staked-balance) stake-amount))
+               (slash-amount
+                (if
+                 (or?
+                   (>= locked-balance)
+                   (>= (+ locked-balance staked-balance)) stake-amount)
                    stake-amount
                    (+ staked-balance locked-balance))))
-      (with-capability (GOV_GUARD)
-      (install-capability (token::TRANSFER TELLOR_FLEX_ACCOUNT recipient
-        (to-decimal slash-amount)))
 
         (if (>= locked-balance stake-amount)
-            [(update staker-details reporter
-              {'locked-balance: (- locked-balance stake-amount)})
-             (update global-variables 'global-vars
-              {'to-withdraw: (- to-withdraw stake-amount)})]
+            [
+            (install-capability
+              (token::TRANSFER TELLOR_FLEX_ACCOUNT recipient (to-decimal slash-amount)))
+            (token::transfer TELLOR_FLEX_ACCOUNT recipient (to-decimal slash-amount))
+
+            (update staker-details reporter
+            {'locked-balance: (- locked-balance stake-amount)})
+            (update global-variables 'global-vars
+            {'to-withdraw: (- to-withdraw stake-amount)})
+            ]
 
             (if (>= (+ locked-balance staked-balance) stake-amount)
-              [
+             [
+              (update-stake-and-pay-rewards reporter (- staked-balance (- stake-amount locked-balance)))
               (install-capability
-                (token::TRANSFER TELLOR_FLEX_ACCOUNT reporter
-                  (to-decimal (- staked-balance (- stake-amount locked-balance)))))
-              (update-stake-and-pay-rewards reporter
-                (- staked-balance (- stake-amount locked-balance)))
-               (update global-variables 'global-vars
-                { 'to-withdraw: (- to-withdraw locked-balance) })
-               (update staker-details reporter { 'locked-balance: 0 })]
+                (token::TRANSFER TELLOR_FLEX_ACCOUNT recipient (to-decimal slash-amount)))
+              (token::transfer TELLOR_FLEX_ACCOUNT recipient (to-decimal slash-amount))
 
-              [(update-stake-and-pay-rewards reporter 0)
-               (update global-variables 'global-vars
-                { 'to-withdraw: (- to-withdraw locked-balance) })
-               (update staker-details reporter { 'locked-balance: 0 })]
+              (update global-variables 'global-vars
+              { 'to-withdraw: (- to-withdraw locked-balance) })
+              (update staker-details reporter { 'locked-balance: 0 })
+             ]
+             [
+              (update-stake-and-pay-rewards reporter 0)
+              (install-capability
+                (token::TRANSFER TELLOR_FLEX_ACCOUNT reporter (to-decimal slash-amount)))
+              (token::transfer TELLOR_FLEX_ACCOUNT reporter (to-decimal slash-amount))
+
+              (update global-variables 'global-vars { 'to-withdraw: (- to-withdraw locked-balance) })
+              (update staker-details reporter { 'locked-balance: 0 })
+             ]
             )
           )
-        (token::transfer TELLOR_FLEX_ACCOUNT recipient (to-decimal slash-amount))
-        )
+        slash-amount)
       )
     )
   )
@@ -570,23 +587,23 @@
           (block-time (block-time-in-seconds))
           (to-withdraw (to-withdraw)))
 
-         (with-capability (STAKER staker)
-           (with-read staker-details staker
-             { "start-date" := start-date
-             , "locked-balance" := locked-balance }
-             (enforce (> (- block-time start-date) SEVEN_DAYS) "7 days didn't pass")
-             (enforce (> locked-balance 0) "reporter not locked for withdrawal")
-             (install-capability (token::TRANSFER TELLOR_FLEX_ACCOUNT staker (to-decimal locked-balance)))
-             (token::transfer TELLOR_FLEX_ACCOUNT staker (to-decimal locked-balance))
+        (with-capability (STAKER staker)
+          (with-read staker-details staker
+            { "start-date" := start-date
+            , "locked-balance" := locked-balance }
+            (enforce (> (- block-time start-date) SEVEN_DAYS) "7 days didn't pass")
+            (enforce (> locked-balance 0) "reporter not locked for withdrawal")
+            (install-capability (token::TRANSFER TELLOR_FLEX_ACCOUNT staker (to-decimal locked-balance)))
+            (token::transfer TELLOR_FLEX_ACCOUNT staker (to-decimal locked-balance))
 
-             (update staker-details staker { "locked-balance": 0 } )
+            (update staker-details staker { "locked-balance": 0 } )
 
-             (update global-variables 'global-vars
-              { 'to-withdraw: (- to-withdraw locked-balance )})
+            (update global-variables 'global-vars
+            { 'to-withdraw: (- to-withdraw locked-balance )})
         )
       )
-     )
     )
+  )
 ; *****************************************************************************
 ; *                                                                           *
 ; *                          Getter functions                                 *
@@ -670,7 +687,7 @@
     )
   )
 
-  (defun get-reporter-by-timestamp (query-id:string timestamp:integer)
+  (defun get-reporter-by-timestamp:string (query-id:string timestamp:integer)
     (at 'reporter (read reports (concatenate query-id timestamp)))
   )
 
@@ -678,7 +695,7 @@
     (at 'reporter-last-timestamp (read staker-details reporter))
   )
 
-  (defun get-reports-submitted-by-address (reporter:string)
+  (defun get-reports-submitted-by-address:integer (reporter:string)
     (at 'reports-submitted (read staker-details reporter))
   )
 
@@ -720,7 +737,7 @@
       (at 'is-disputed (read reports (concatenate query-id timestamp)))
   )
 
-  (defun retrieve-data:integer (query-id:string timestamp:integer)
+  (defun retrieve-data:string (query-id:string timestamp:integer)
     @doc "Get value for a query id at given timestamp"
       (at 'value (read reports (concatenate query-id timestamp)))
   )
@@ -916,47 +933,48 @@
 
      )
    )
+
    (defun to-decimal:decimal (amount:integer)
      (/ (/ amount 1.0) PRECISION)
    )
-   (defun calculate-time-based-reward:decimal (block-time:integer)
-     (with-read global-variables 'global-vars
-       { 'token := token:module{fungible-v2}
-       , 'total-stake-amount := total-stake-amount
-       , 'staking-rewards-balance := staking-rewards-balance
-       , 'to-withdraw := to-withdraw
-       , 'time-of-last-new-value := time-of-last-new-value
-       , 'time-based-reward := time-based-reward }
 
-       (let* ((reward (/ (*
-               (- block-time time-of-last-new-value) time-based-reward) 300))
+    (defun calculate-time-based-reward:decimal (block-time:integer)
+      (with-read global-variables 'global-vars
+        { 'token := token:module{fungible-v2}
+        , 'total-stake-amount := total-stake-amount
+        , 'staking-rewards-balance := staking-rewards-balance
+        , 'to-withdraw := to-withdraw
+        , 'time-of-last-new-value := time-of-last-new-value
+        , 'time-based-reward := time-based-reward }
+
+        (let* ((reward (/ (*
+                (- block-time time-of-last-new-value) time-based-reward) 300))
               (contract-balance (token::get-balance TELLOR_FLEX_ACCOUNT))
               (total-time-based-rewards-balance
                 (- (precision contract-balance)
                   (fold (+) total-stake-amount
-                   [staking-rewards-balance to-withdraw]))))
+                    [staking-rewards-balance to-withdraw]))))
 
-             (if (and (> total-time-based-rewards-balance 0) (> reward 0) )
-                 (if (< total-time-based-rewards-balance reward)
-                   (to-decimal total-time-based-rewards-balance)
-                   (to-decimal reward)
-                 )
-                 0.0
-             )
-       )
-     )
-   )
+              (if (and (> total-time-based-rewards-balance 0) (> reward 0) )
+                  (if (< total-time-based-rewards-balance reward)
+                    (to-decimal total-time-based-rewards-balance)
+                    (to-decimal reward)
+                  )
+                  0.0
+              )
+        )
+      )
+    )
 
-   (defun accumulated-reward:integer (total-stake-amount:integer total-reward-debt:integer)
-     (-
+    (defun accumulated-reward:integer (total-stake-amount:integer total-reward-debt:integer)
+      (-
       (/
-       (* (new-accumulated-reward-per-share) total-stake-amount)
-       PRECISION
+        (* (new-accumulated-reward-per-share) total-stake-amount)
+        PRECISION
       )
       total-reward-debt
       )
-
-   )
+    )
 
    (defun new-accumulated-reward-per-share:integer ()
     @doc "Helper function to calculate new-accumulated-reward-per-share"
@@ -1072,7 +1090,7 @@
      (let ((end (at 'end a))
            (timestamp (at 'target a))
            (timestamps (at 'timestamps a)))
-       (if (at 'disputed a) a
+       (if (not (at 'disputed a)) a
          { 'found: true
          , 'target: timestamp
          , 'start: 0
