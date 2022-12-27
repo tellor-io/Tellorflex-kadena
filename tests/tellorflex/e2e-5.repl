@@ -24,7 +24,7 @@
 (begin-tx)
 (free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
 (expect "Balance should be 300.0" 300.0 (coin.get-balance "tellorflex"))
-(test-capability (free.governance.PRIVATE))
+(test-capability (free.governance-mock.PRIVATE))
 (free.tellorflex.remove-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) 86400)
 (free.tellorflex.slash-reporter "reporter1-keyset" "reporter2-keyset")
 (commit-tx)

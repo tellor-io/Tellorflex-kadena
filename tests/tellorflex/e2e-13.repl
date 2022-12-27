@@ -17,7 +17,7 @@
 ; expect failure
 (expect-failure "not granted: (free.governance.PRIVATE)"
   (free.tellorflex.remove-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (free.h.blockTime)))
-(test-capability (free.governance.PRIVATE))
+(test-capability (free.governance-mock.PRIVATE))
 (free.tellorflex.remove-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (free.h.blockTime))
 (free.tellorflex.slash-reporter "reporter1-keyset" "reporter2-keyset")
 (commit-tx)
