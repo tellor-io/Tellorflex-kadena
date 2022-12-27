@@ -73,9 +73,20 @@
   (deftable vote-tally-by-address:{vote-tally-by-address-schema})
   (deftable dispute-ids-by-reporter:{dispute-ids-by-reporter-schema})
 
+  (defconst TWELVE_HOURS 43200)
+  (defconst ONE_DAY 86400)
+  (defconst GOV_ACCOUNT 'governance)
 
   (defun init-global (oracle:module{free.i-flex} token:module{fungible-v2})
-    (insert global 'global-vars { 'oracle: oracle , 'token: token, 'team-multisig: "" , 'vote-count: 0 , 'autopay-query-id: ""})
+    (insert global 'global-vars
+      { 'oracle: oracle
+      , 'token: token
+      , 'team-multisig: ""
+      , 'vote-count: 0
+      , 'autopay-query-id: ""})
+
+    (token::create-account 'governance (create-guard))
+    "Global variables set!"
   )
 
   (defun call-tellorflex ()
@@ -88,105 +99,167 @@
 
   (defun begin-dispute:string (account:string query-id:string timestamp:integer)
     @doc "Initializes a dispute/vote in the system"
+    (enforce-keyset (read-keyset account))
     (let* ((tellorflex:module{free.i-flex} (at 'oracle (read global 'global-vars)))
            (block-number (tellorflex::get-block-number-by-timestamp query-id timestamp))
            (hash (hash [query-id timestamp]))
            (dispute-id (+ (at 'vote-count (read global 'global-vars)) 1))
            (dispute-fee (get-dispute-fee))
-           (block-time (tellorflex.block-time-in-seconds))
-           (disputed-reporter (tellorflex.get-reporter-by-timestamp query-id timestamp)))
-        (enforce (!= block-number 0) "No value exists at given timestamp")
-        (with-default-read vote-rounds hash { 'dispute-ids: []} { 'dispute-ids := dispute-ids }
-          (write vote-rounds hash { 'dispute-ids: (+ dispute-ids [dispute-id])})
-        )
-        (insert vote-info dispute-id
-          { 'identifier-hash: hash
-          , 'vote-round: (length (at 'dispute-ids (read vote-rounds hash)))
-          , 'start-date: block-time
-          , 'block-number: (tellorflex.block-height)
-          , 'fee: 0
-          , 'tally-date: 0
-          , 'token-holders: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-          , 'users: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-          , 'reporters: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-          , 'team-multisig: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-          , 'executed: false
-          , 'result: ""
-          , 'initiator: account
-          , 'voters: []
-          })
-
-        (insert dispute-info dispute-id
-          { 'query-id: query-id
-          , 'timestamp: timestamp
-          , 'value: ""
-          , 'disputed-reporter: disputed-reporter
-          , 'slashed-amount: 0
-          })
-        (with-default-read dispute-ids-by-reporter disputed-reporter { 'dispute-ids: [] }{ 'dispute-ids := dispute-ids }
-          (write dispute-ids-by-reporter disputed-reporter { 'dispute-ids: (+ dispute-ids [dispute-id])}))
-
-          (if (= vote-rounds 1)
-            (begin-dispute-pact account dispute-id query-id timestamp)
-            (else-begin-dispute-pact account block-time dispute-id dispute-fee (at 'dispute-ids (read vote-rounds hash)))
+           (block-time (block-time))
+           (disputed-reporter (tellorflex::get-reporter-by-timestamp query-id timestamp)))
+        (enforce (!= block-number 0) (format "No value exists at given timestamp {}"[block-number]))
+        (with-default-read vote-rounds hash
+          { 'dispute-ids: []} { 'dispute-ids := dispute-ids }
+          (let ((disputes (+ 1 (length dispute-ids))))
+          (with-capability (PRIVATE)
+            (if (= disputes 1)
+              (with-default-read open-disputes-on-id query-id
+                { 'open-disputes-on-id: 0 } { 'open-disputes-on-id := open-disputes }
+                (enforce (< (- block-time timestamp) TWELVE_HOURS)
+                  "Dispute must be started within reporting lock time")
+                (let ((fee (* dispute-fee (^ 2 open-disputes)))
+                      (token:module{fungible-v2} (token)))
+                    (token::transfer account GOV_ACCOUNT (float fee))
+                    (insert dispute-info (str dispute-id)
+                      { 'query-id: query-id
+                      , 'timestamp: timestamp
+                      , 'value: (tellorflex::retrieve-data query-id timestamp)
+                      , 'disputed-reporter: disputed-reporter
+                      , 'slashed-amount:
+                        (tellorflex::slash-reporter disputed-reporter 'governance)
+                      })
+                    (tellorflex::remove-value query-id timestamp)
+                    (insert vote-info (str dispute-id)
+                      { 'identifier-hash: hash
+                      , 'vote-round: disputes
+                      , 'start-date: block-time
+                      , 'block-number: (at 'block-height (chain-data))
+                      , 'fee: fee
+                      , 'tally-date: 0
+                      , 'token-holders: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+                      , 'users: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+                      , 'reporters: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+                      , 'team-multisig: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+                      , 'executed: false
+                      , 'result: ""
+                      , 'initiator: account
+                      , 'voters: []
+                      })
+                    (write open-disputes-on-id query-id
+                      { 'open-disputes-on-id: (+ open-disputes 1)})
+                  )
+                )
+                (let ((prev-tally-date (at 'tally-date (read vote-info (str (- disputes 1)))))
+                      (fee (* dispute-fee (^ 2 (- dispute-id 1))))
+                      (token:module{fungible-v2} (token)))
+                    (enforce (< (- block-time prev-tally-date) ONE_DAY)
+                      "New dispute round must be started within a day")
+                    (token::transfer account GOV_ACCOUNT (float fee))
+                    (insert vote-info (str dispute-id)
+                      { 'identifier-hash: hash
+                      , 'vote-round: disputes
+                      , 'start-date: block-time
+                      , 'block-number: (at 'block-height (chain-data))
+                      , 'fee: fee
+                      , 'tally-date: 0
+                      , 'token-holders: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+                      , 'users: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+                      , 'reporters: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+                      , 'team-multisig: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+                      , 'executed: false
+                      , 'result: ""
+                      , 'initiator: account
+                      , 'voters: []
+                      })
+                    (with-read dispute-info (str (at 0 dispute-ids))
+                      { 'slashed-amount := slashed-amount , 'value := value }
+                      (insert dispute-info (str dispute-id)
+                        { 'query-id: query-id
+                        , 'timestamp: timestamp
+                        , 'value: value
+                        , 'disputed-reporter: disputed-reporter
+                        , 'slashed-amount: slashed-amount
+                        }))
+                )
+              )
             )
-        (with-read global 'global-vars { 'vote-count := vote-count }
-          (update global 'global-vars { 'vote-count: (+ vote-count 1)}))
+            (write vote-rounds hash { 'dispute-ids: (+ dispute-ids [dispute-id])})
+            (with-default-read dispute-ids-by-reporter disputed-reporter
+              { 'dispute-ids: [] }{ 'dispute-ids := dispute-ids }
+              (write dispute-ids-by-reporter disputed-reporter
+                { 'dispute-ids: (+ dispute-ids [dispute-id])}))
+
+            (with-read global 'global-vars { 'vote-count := vote-count }
+              (update global 'global-vars { 'vote-count: (+ vote-count 1)}))
+          )
         )
+      )
   )
 
   (defun execute-vote:string (dispute-id:integer)
-    (enforce (and
-      (<= dispute-id (at 'vote-count (read global 'global-vars)))
-      (> dispute-id 0)) "Dispute ID must be valid")
-    (with-read vote-info dispute-id
+    (let ((vote-count (at 'vote-count (read global 'global-vars))))
+      (enforce (and (<= dispute-id vote-count) (> dispute-id 0))
+        "Dispute ID must be valid"))
+    (with-read vote-info (str dispute-id)
       { 'executed := executed
       , 'tally-date := tally-date
       , 'vote-round := vote-round
-      , 'hash := hash
+      , 'identifier-hash := identifier-hash
       , 'result := result
       }
       (enforce (not executed) "Vote has already been executed")
       (enforce (> tally-date 0) "Vote must be tallied")
-      (with-read vote-rounds hash { 'dispute-ids := dispute-ids }
+      (with-read vote-rounds identifier-hash { 'dispute-ids := dispute-ids }
         (enforce (= (length dispute-ids) vote-round) "Must be the final vote")
-        (enforce (>= (- (tellorflex.block-time-in-seconds) tally-date) (days 1)) "1 day has to pass after tally to allow for disputes"))
-      (update vote-info dispute-id { 'executed: true })
+        (enforce (>= (- (block-time) tally-date) ONE_DAY)
+          "1 day has to pass after tally to allow for disputes")
+        (update vote-info (str dispute-id) { 'executed: true })
 
-      (let* ( (query-id (at 'query-id (read dispute-info dispute-id)))
-              (open-disputes-count (at 'open-disputes-on-id (read open-disputes-on-id query-id)))
-              (token:module{fungible-v2} (at 'token (read global 'global-vars))))
+      (let* ((query-id (at 'query-id (read dispute-info (str dispute-id))))
+             (open-disputes-count
+               (at 'open-disputes-on-id (read open-disputes-on-id query-id)))
+             (token:module{fungible-v2} (at 'token (read global 'global-vars))))
+          (with-capability (PRIVATE)
+            (if (= result 'PASSED)
+                (fold
+                  (vote-passed) identifier-hash
+                  (enumerate 1 (length dispute-ids))
+                )
+                (if (= result 'INVALID)
+                    (with-read dispute-info (str dispute-id)
+                      { 'disputed-reporter := disputed-reporter
+                      , 'slashed-amount := slashed-amount }
+                    (fold
+                      (vote-invalid) identifier-hash
+                      (enumerate (length dispute-ids) 1))
+                    (token::transfer GOV_ACCOUNT disputed-reporter slashed-amount)
+                    )
 
-        (update open-disputes-on-id query-id { 'open-disputes-on-id: (- open-disputes-count 1) })
+                    (if (= result 'FAILED)
+                      (let ((reporter (at 'disputed-reporter (read dispute-info (str dispute-id))))
+                        (amount
+                          (float (+
+                    (fold (vote-failed) 0 dispute-ids)
+                    (at 'slashed-amount (read dispute-info (str dispute-id)))))))
 
-    (with-capability (PRIVATE)
-      (if (= result 'PASSED)
-          (fold (vote-passed) hash (enumerate (length (at 'dispute-ids (read vote-rounds hash))) 1))
-
-          (if (= result 'INVALID)
-              [
-                (fold (vote-invalid) hash (enumerate (length (at 'dispute-ids (read vote-rounds hash))) 1))
-                (with-read dispute-info dispute-id
-                  { 'disputed-reporter := disputed-reporter , 'slashed-amount := slashed-amount }
-                  (token::transfer 'governance disputed-reporter slashed-amount))
-              ]
-          )
-              (if (= result 'FAILED)
-                (token::transfer
-                  'governance
-                  (at 'disputed-reporter (read dispute-info dispute-id))
-                  (+ (fold (vote-failed) 0 (at 'dispute-ids (read vote-rounds hash))) (at 'slashed-amount (read dispute-info dispute-id)))
-              )
+                    (install-capability
+                      (token::TRANSFER GOV_ACCOUNT reporter amount))
+                    (token::transfer GOV_ACCOUNT reporter amount)
+                  )
               "Invalid result"
-            )
+              )
           )
         )
       )
+    (update open-disputes-on-id query-id
+      { 'open-disputes-on-id: (- open-disputes-count 1) })
+     )
     )
+   )
   )
 
   (defun tally-votes (dispute-id:integer)
-    (with-read vote-info dispute-id
+    (with-read vote-info (str dispute-id)
       { 'tally-date := tally-date
       , 'vote-round := vote-round
       , 'start-date := start-date
@@ -199,8 +272,8 @@
       (let ((vote-count (at 'vote-count (read global 'global-vars))))
       (enforce (and (<= dispute-id vote-count) (> dispute-id 0)) "Vote doesn't exist"))
       (enforce (or
-        (>= (- (tellorflex.block-time-in-seconds) start-date) (* 86400 vote-round))
-        (>= (- (tellorflex.block-time-in-seconds) start-date) (* 86400 6))) "Time for voting has not elapsed")
+        (>= (- (block-time) start-date) (* 86400 vote-round))
+        (>= (- (block-time) start-date) (* 86400 6))) "Time for voting has not elapsed")
       (let* (
         (token-vote-sum
 
@@ -233,17 +306,17 @@
             [token-vote-sum-updated reporters-vote-sum-updated multisig-vote-sum-updated users-vote-sum-updated]))))
 
           (if (> scaled-does-support (+ scaled-against scaled-invalid))
-              (update vote-info dispute-id { 'result: "PASSED" })
+              (update vote-info (str dispute-id) { 'result: "PASSED" })
               (if (> scaled-against (+ scaled-does-support scaled-invalid))
-                  (update vote-info dispute-id { 'result: "FAILED" })
-                  (update vote-info dispute-id { 'result: "INVALID" }))))
+                  (update vote-info (str dispute-id){ 'result: "FAILED" })
+                  (update vote-info (str dispute-id) { 'result: "INVALID" }))))
 
-          (update vote-info dispute-id { 'tally-date: (tellorflex.block-time-in-seconds)}))
+          (update vote-info (str dispute-id) { 'tally-date: (block-time)}))
   )
 
-  (defun vote (dispute-id:integer supports:bool invalid-query:bool voter-account:string)
+  (defun vote (dispute-id:integer supports:bool invalid:bool voter-account:string)
     (enforce-keyset (read-keyset voter-account))
-    (with-read vote-info dispute-id
+    (with-read vote-info (str dispute-id)
       { 'tally-date := tally-date
       , 'voters := voters
       , 'token-holders := token-holders
@@ -255,158 +328,187 @@
       ; TODO: catch errors for voter that doesn't exist as staker info
       (let ((vote-count (at 'vote-count (read global 'global-vars))))
         (enforce (and (<= dispute-id vote-count) (> dispute-id 0)) "Vote doesn't exist"))
-      (enforce = tally-date 0 "Vote has already been tallied")
+      (enforce (= tally-date 0) "Vote has already been tallied")
       (enforce (not (contains voter-account voters)) "Voter has already voted");check how efficient this is?
-      (update vote-info dispute-id { 'voters : (+ voters [voter-account])})
-      (let* ((token:module{fungible-v2} (at 'token (read global 'global-vars)))
+      (update vote-info (str dispute-id) { 'voters : (+ voters [voter-account])})
+
+      (let* ((tellorflex:module{free.i-flex} (at 'oracle (read global 'global-vars)))
+             (token:module{fungible-v2} (at 'token (read global 'global-vars)))
              (team-multisig (at 'team-multisig (read global 'global-vars)))
-             (voter-stake-info (tellorflex.get-staker-info voter-account))
+             (voter-stake-info (try {} (tellorflex::get-staker-info voter-account)))
+             (reports-submitted (try 0
+               (tellorflex::get-reports-submitted-by-address voter-account)))
              (voter-balance
                ; TODO: voter doesn't have to be staker could just holder
-               (fold (+) 0 [
-               (token::get-balance voter-account)
-               (at 'staked-balance voter-stake-info)
-               (at 'locked-balance voter-stake-info)])))
-            (if invalid-query
-              [
-              (update vote-info dispute-id
-                { 'token-holders: { 'does-support: (at 'does-support token-holders)
-                                  , 'against: (at 'against token-holders)
-                                  , 'invalid-query: (+ (at 'invalid-query token-holders) voter-balance)}
-                , 'reporters: { 'does-support: (at 'does-support reporters)
-                              , 'against: (at 'against reporters)
-                              , 'invalid-query: (+ (at 'invalid-query reporters) (tellorflex.get-reports-submitted-by-address voter-account))}
-                , 'users: { 'does-support: (at 'does-support users)
-                              , 'against: (at 'against users)
-                              , 'invalid-query: (+ (at 'invalid-query users) (get-user-tips voter-account))}})
-              (if (= voter-account team-multisig)
-                (update vote-info dispute-id
-                  { 'team-multisig: { 'does-support: (at 'does-support team-multisig)
-                                    , 'against: (at 'against team-multisig)
-                                    , 'invalid-query: (+ (at 'invalid-query team-multisig) 1)}}) "")
-
-              ]
+               (if (= {} voter-stake-info) (round (* (token::get-balance voter-account) (^ 10 18)))
+                   (fold (+) 0 [
+                   (round (* (token::get-balance voter-account) (^ 10 18)))
+                   (at 'staked-balance voter-stake-info)
+                   (at 'locked-balance voter-stake-info)]))))
+            (if invalid
+              (let ((update-voteinfo
+                (update vote-info (str dispute-id)
+                  { 'token-holders:
+                    { 'does-support: (at 'does-support token-holders)
+                    , 'against: (at 'against token-holders)
+                    , 'invalid-query: (+
+                                        (at 'invalid-query token-holders)
+                                        voter-balance)
+                    }
+                  , 'reporters:
+                    { 'does-support: (at 'does-support reporters)
+                    , 'against: (at 'against reporters)
+                    , 'invalid-query: (+
+                                        (at 'invalid-query reporters)
+                                        reports-submitted
+                                      )
+                    }
+                , 'users:
+                  { 'does-support: (at 'does-support users)
+                  , 'against: (at 'against users)
+                  , 'invalid-query: (+
+                                      (at 'invalid-query users)
+                                      (get-user-tips voter-account)
+                                    )
+                  }
+                })))
+                update-voteinfo
+                (if (= voter-account team-multisig)
+                  (update vote-info (str dispute-id)
+                    { 'team-multisig:
+                      { 'does-support: (at 'does-support team-multisig)
+                      , 'against: (at 'against team-multisig)
+                      , 'invalid-query: (+ (at 'invalid-query team-multisig) 1)}})
+                  "not multisig")
+              )
               (if supports
-                [
-                (update vote-info dispute-id
-                  { 'token-holders: { 'does-support: (+ (at 'does-support token-holders) voter-balance)
-                                    , 'against: (at 'against token-holders)
-                                    , 'invalid-query: (at 'invalid-query token-holders)}
-                  , 'reporters: { 'does-support: (+ (at 'does-support reporters) (tellorflex.get-reports-submitted-by-address voter-account))
-                                , 'against: (at 'against reporters)
-                                , 'invalid-query: (at 'invalid-query reporters)}
-                  , 'users: { 'does-support: (+ (at 'does-support users) (get-user-tips voter-account))
-                            , 'against: (at 'against users)
-                            , 'invalid-query: (at 'invalid-query users)}})
-                (if (= voter-account team-multisig)
-                  (update vote-info dispute-id
-                    { 'team-multisig: { 'does-support: (+ (at 'does-support team-multisig) 1)
-                                      , 'against: (at 'against team-multisig)
-                                      , 'invalid-query: (at 'invalid-query team-multisig)}}) "")
-                ]
+                (let ((update-voteinfo
+                (update vote-info (str dispute-id)
+                  { 'token-holders:
+                    { 'does-support: (+
+                                        (at 'does-support token-holders)
+                                        voter-balance
+                                     )
+                    , 'against: (at 'against token-holders)
+                    , 'invalid-query: (at 'invalid-query token-holders)
+                    }
+                  , 'reporters:
+                    { 'does-support: (+
+                                        (at 'does-support reporters)
+                                        reports-submitted
+                                     )
+                    , 'against: (at 'against reporters)
+                    , 'invalid-query: (at 'invalid-query reporters)}
+                  , 'users:
+                    { 'does-support: (+
+                                        (at 'does-support users)
+                                        (get-user-tips voter-account)
+                                     )
+                    , 'against: (at 'against users)
+                    , 'invalid-query: (at 'invalid-query users)
+                    }
+                  }
+                )))
+
+                  update-voteinfo
+                  (if (= voter-account team-multisig)
+                      (update vote-info (str dispute-id)
+                        { 'team-multisig:
+                          { 'does-support: (+ (at 'does-support team-multisig) 1)
+                          , 'against: (at 'against team-multisig)
+                          , 'invalid-query: (at 'invalid-query token-holders)
+                          }
+                        }
+                      )
+                      "not multisig"
+                   )
                 )
-                [
-                (update vote-info dispute-id
-                  { 'token-holders: { 'does-support: (at 'does-support token-holders)
-                                    , 'against: (+ (at 'against token-holders) voter-balance)
-                                    , 'invalid-query: (at 'invalid-query token-holders)}
-                  , 'reporters: { 'does-support: (at 'does-support reporters)
-                                , 'against: (+ (at 'against reporters) (tellorflex.get-reports-submitted-by-address voter-account))
-                                , 'invalid-query: (at 'invalid-query reporters)}
-                  , 'users: { 'does-support: (at 'does-support users)
-                            , 'against: (+ (at 'against users) (get-user-tips voter-account))
-                            , 'invalid-query: (at 'invalid-query users)}})
-                (if (= voter-account team-multisig)
-                  (update vote-info dispute-id
-                    { 'team-multisig: { 'does-support: (at 'does-support team-multisig)
-                                      , 'against: (+ (at 'against team-multisig) 1)
-                                      , 'invalid-query: (at 'invalid-query team-multisig)}}) "")
-                ]))
-                (with-default-read vote-tally-by-address voter-account
-                  { 'vote-tally-by-address: 0 }{ 'vote-tally-by-address := vote-tally-by-address}
-                  (update vote-tally-by-address voter-account { 'vote-tally-by-address: (+ vote-tally-by-address 1)})))
-  )
-  ; *****************************************************************************
-  ; *                                                                           *
-  ; *                  (begin-dispute) helpers                                  *
-  ; *                                                                           *
-  ; *****************************************************************************
-  (defpact begin-dispute-pact (account:string dispute-id:integer query-id:string timestamp:integer dispute-fee:integer)
+                (let ((update-voteinfo
+                  (update vote-info (str dispute-id)
+                    { 'token-holders:
+                      { 'does-support: (at 'does-support token-holders)
+                      , 'against: (+ (at 'against token-holders) voter-balance)
+                      , 'invalid-query: (at 'invalid-query token-holders)
+                      }
+                    , 'reporters:
+                      { 'does-support: (at 'does-support reporters)
+                      , 'against: (+
+                                    (at 'against reporters)
+                                    reports-submitted
+                                  )
+                      , 'invalid-query: (at 'invalid-query reporters)
+                      }
+                    , 'users:
+                      { 'does-support: (at 'does-support users)
+                      , 'against: (+
+                                    (at 'against users)
+                                    (get-user-tips voter-account)
+                                  )
+                      , 'invalid-query: (at 'invalid-query users)
+                      }
+                  })))
 
-    (step
-      (require-capability (PRIVATE))
-      (enforce (< (- (tellorflex.block-time-in-seconds) timestamp) (hours 12)) "Dispute must be started within reporting lock time"))
+                  update-voteinfo
+                  (if (= voter-account team-multisig)
+                      (update vote-info (str dispute-id)
+                        { 'team-multisig:
+                          { 'does-support: (at 'does-support team-multisig)
+                          , 'against: (+ (at 'against team-multisig) 1)
+                          , 'invalid-query: (at 'invalid-query token-holders)
+                          }
+                        }
+                      )
+                      "not multisig"
+                   )
+                )
 
-    (step
-      (require-capability (PRIVATE))
-      (with-default-read open-disputes-on-id query-id
-        { 'open-disputes-on-id: 0 } { 'open-disputes-on-id := open-disputes-on-id }
-        (update open-disputes-on-id query-id { 'open-disputes-on-id: (+ open-disputes-on-id 1)})))
-
-    (step
-      (require-capability (PRIVATE))
-      (update dispute-info dispute-id
-      { 'slashed-amount: (tellorflex.slash-reporter (at 'disputed-reporter (read dispute-info dispute-id)) 'governance)
-      , 'value: (tellorflex.retrieve-data query-id timestamp)}))
-
-    (step
-      (require-capability (PRIVATE))
-      (tellorflex.remove-value query-id timestamp))
-
-    (step
-      (require-capability (PRIVATE))
-      (let ( (fee (* dispute-fee (^ 2 (- (at 'open-disputes-on-id (read open-disputes-on-id query-id)) 1))))
-             (token:module{fungible-v2} (at 'token (read global 'global-vars))))
-        (update vote-info dispute-id { 'fee: fee })
-        (token::transfer-create account 'governance (create-guard) fee)))
-  )
-
-  (defpact else-begin-dispute-pact (account:string block-time:integer dispute-id:integer dispute-fee:integer dispute-ids:[integer])
-      (step
-        (require-capability (PRIVATE))
-        (let ( (prev-tally-date (at 'tally-date (read vote-info (- (length (at 'dispute-ids (read vote-rounds hash))) 2)))))
-        (enforce (< (- block-time prev-tally-date) (days 1)) "New dispute round must be started within a day")))
-      (step
-        (require-capability (PRIVATE))
-        (with-read dispute-info (at 0 (at 'dispute-ids (read vote-rounds hash)))
-          { 'slashed-amount := slashed-amount , 'value := value }
-          (update dispute-info dispute-id
-            { 'slashed-amount: slashed-amount , 'value: value })))
-      (step
-        (require-capability (PRIVATE))
-        (let ( (fee (* dispute-fee (^ 2 (- (length (at 'dispute-ids (read vote-rounds hash))) 1))))
-               (token:module{fungible-v2} (at 'token (read global 'global-vars))))
-          (update vote-info dispute-id { 'fee: fee })
-          (token::transfer-create account 'governance (create-guard) fee)))
+              )
+             )
+      )
+      (with-default-read vote-tally-by-address voter-account
+        { 'vote-tally-by-address: 0 } { 'vote-tally-by-address := vote-tally }
+        (write vote-tally-by-address voter-account
+          { 'vote-tally-by-address: (+ vote-tally 1) })) ;token-holders
+    )
   )
   ; *****************************************************************************
   ; *                                                                           *
   ; *                 (execute-vote) helpers                                    *
   ; *                                                                           *
   ; *****************************************************************************
-
   (defun vote-passed (hash:string idx:integer)
     (require-capability (PRIVATE))
     (let* ((vote-round (at 'dispute-ids (read vote-rounds hash)))
-           (vote-id (at (- idx 1) vote-round))
-           (token:module{fungible-v2} (at 'token (read global 'global-vars))))
-      (with-read vote-info vote-id { 'initiator := initiator , 'slashed-amount := slashed-amount , 'fee := fee }
+           (vote-id (at (- idx 1) vote-round)))
+      (with-read vote-info (str vote-id)
+        { 'initiator := initiator , 'fee := fee }
         (if (= idx 1)
-            (token::transfer 'governance initiator (+ slashed-amount fee))
-            (token::transfer 'governance initiator fee))
+          (let* ((slashed-amount (at 'slashed-amount (read dispute-info (str vote-id)))))
+                (transfer initiator (float (+ slashed-amount fee))))
+          (transfer initiator (float fee))
       )
     )
     hash
   )
+)
+(defun transfer (account amount)
+  (require-capability (PRIVATE))
+  (let ((token:module{fungible-v2} (at 'token (read global 'global-vars))))
+    (install-capability
+      (token::TRANSFER GOV_ACCOUNT account amount))
+      (token::transfer GOV_ACCOUNT account amount))
 
+)
   (defun vote-invalid (hash:string idx:integer)
     (require-capability (PRIVATE))
     (let* ((vote-round (at 'dispute-ids (read vote-rounds hash)))
            (vote-id (at (- idx 1) vote-round))
            (token:module{fungible-v2} (at 'token (read global 'global-vars))))
-      (with-read vote-info vote-id
-        { 'initiator := initiator , 'slashed-amount := slashed-amount , 'fee := fee }
-        (token::transfer 'governance initiator fee)
+      (with-read vote-info (str vote-id)
+        { 'initiator := initiator , 'fee := fee }
+        (install-capability
+          (token::TRANSFER GOV_ACCOUNT initiator (float fee)))
+        (token::transfer GOV_ACCOUNT initiator (float fee))
       )
     )
     hash
@@ -414,7 +516,7 @@
 
   (defun vote-failed (num1:integer dispute-id:integer)
     (require-capability (PRIVATE))
-    (with-read vote-info dispute-id { 'fee := fee }
+    (with-read vote-info (str dispute-id) { 'fee := fee }
       (+ num1 fee))
   )
   ; *****************************************************************************
@@ -449,7 +551,7 @@
 
   (defun get-dispute-info:object{dispute-schema} (dispute-id:integer)
     @doc "Returns info on a dispute for a given ID"
-    (read dispute-info dispute-id)
+    (read dispute-info (str dispute-id))
   )
 
   (defun get-open-disputes-on-id:integer (query-id:string)
@@ -462,9 +564,9 @@
     (at 'vote-count (read global 'global-vars))
   )
 
-  (defun getVoteInfo:object{vote-schema} (dispute-id:integer)
+  (defun get-vote-info:object{vote-schema} (dispute-id:integer)
     @doc "Returns info on a vote for a given vote ID"
-    (read vote-info dispute-id)
+    (read vote-info (str dispute-id))
   )
 
   (defun get-vote-rounds:[integer] (hash:string)
@@ -476,28 +578,17 @@
     @doc "Returns the total number of votes cast by an address"
     (try 0 (read vote-tally-by-address voter [ 'vote-tally-by-address ]))
   )
-  (defun get-user-tips:integer (user:string)
-  ; requires autopay
-    ; (require-capability (PRIVATE))
-    (let* ((data-before (tellorflex.get-data-before (at 'autopay-query-id (read global 'global-vars)) (- (tellorflex.block-time-in-seconds) (hours 12))))
-           (timestamp (at 'timestamp data-before))
-           (value (at 'value data-before)))
-           0)
 
+  (defun str (num:integer) (int-to-str 10 num))
+
+  (defun float (num:integer) (/ (/ num 1.0) (^ 10 18)))
+
+  (defun block-time ()
+    (str-to-int 10
+      (format-time "%s" (at 'block-time (chain-data))))
   )
+
+  (defun token () (at 'token (read global 'global-vars)) )
+
+  (defun get-user-tips:integer (user:string) 0 )
 )
-; *****************************************************************************
-; *                                                                           *
-; *                         Initialize                                        *
-; *                                                                           *
-; *****************************************************************************
-; (if (read-msg "upgrade")
-;   [
-;   (create-table dispute-info)
-;   (create-table tally)
-;   (create-table vote-info)
-;   (create-table vote-rounds)
-;   (create-table open-disputes-on-id)
-;   (create-table global)
-;   ; (init-global)
-;   ])
