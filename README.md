@@ -46,8 +46,17 @@ pact
 - #### Begin a dispute
 ```lisp
 (defun begin-dispute (account:string query-id:string timestamp:integer) )
+```
+- #### Execute Vote
+```lisp
 (defun execute-vote (dispute-id:integer) )
+```
+- #### Tally Vote
+```lisp
 (defun tally-votes (dispute-id:integer) )
+```
+- #### Vote
+```lisp
 (defun vote (dispute-id:integer supports:bool invalid:bool voter-account:string) )
 ```
 
