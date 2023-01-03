@@ -149,8 +149,9 @@
                       { 'open-disputes-on-id: (+ open-disputes 1)})
                   )
                 )
-                (let ((prev-tally-date (at 'tally-date (read vote-info (str (- disputes 1)))))
-                      (fee (* dispute-fee (^ 2 (- dispute-id 1))))
+                (let ((prev-tally-date
+                        (at 'tally-date (read vote-info (str (at (- disputes 2) dispute-ids)))))
+                      (fee (* dispute-fee (^ 2 (length dispute-ids))))
                       (token:module{fungible-v2} (token)))
                     (enforce (< (- block-time prev-tally-date) ONE_DAY)
                       "New dispute round must be started within a day")
