@@ -1,0 +1,27 @@
+networkId: "development"
+
+code: |-
+  (namespace "free")
+  (define-keyset "free.reporter1" (read-keyset "reporter1"))
+
+data:
+  reporter1: 
+    keys:
+      - "868bc442a6a2b24bd0b194bcfb2f4eed449763e157ae04c00d0ba405f59ea911"
+    pred: "keys-all"
+signers:
+  - public: 868bc442a6a2b24bd0b194bcfb2f4eed449763e157ae04c00d0ba405f59ea911
+
+    caps:
+      - name: "coin.GAS"
+        args: []
+
+publicMeta:
+  chainId: "0"
+  sender: "reporter1"
+
+  gasLimit: 2000
+  gasPrice: 0.0000001
+  ttl: 600
+
+
