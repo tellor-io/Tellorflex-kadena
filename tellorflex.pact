@@ -1,6 +1,13 @@
 ; tellorflex on kadena
 (namespace "free")
+  (if (read-msg "upgrade")
+    "Upgrading contract"
 
+    [
+      (enforce-keyset (read-keyset "tellor-admin-keyset"))
+      (define-keyset "free.tellor-admin-keyset" (read-keyset "tellor-admin-keyset"))
+    ]
+  )
 
 (module tellorflex TELLOR
 
@@ -1155,18 +1162,19 @@
    )
 
 )
-
 ; *****************************************************************************
 ; *                                                                           *
 ; *                         Initialize                                        *
 ; *                                                                           *
 ; *****************************************************************************
-; (if (read-msg "upgrade")
-;   ["upgrade"]
-;   [
-;   ; (create-table stake-info)
-;   ; (create-table reports-table)
-;   ; (create-table timestamps)
-;   ; (create-table global-variables)
-;   (constructor)
-;   ])
+(if (read-msg "upgrade")
+ ["upgrade"]
+ [
+  (create-table global-variables)
+  (create-table reports)
+  (create-table staker-details)
+  (create-table reports-submitted-count)
+  (create-table timestamps)
+  (create-table governance-table)
+  (create-table gov-guard)
+ ])

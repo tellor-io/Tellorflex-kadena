@@ -7,24 +7,6 @@
 (load "../../tellorflex.pact")
 (load "../../governance.pact")
 
- ; governance tables
- (create-table governance.dispute-info)
- (create-table governance.vote-info)
- (create-table governance.vote-rounds)
- (create-table governance.open-disputes-on-id)
- (create-table governance.global)
- (create-table dispute-ids-by-reporter)
- (create-table vote-tally-by-address)
-
- ; tellorflex(oracle) tables
- (create-table tellorflex.global-variables)
- (create-table tellorflex.reports)
- (create-table tellorflex.staker-details)
- (create-table tellorflex.reports-submitted-count)
- (create-table tellorflex.timestamps)
- (create-table tellorflex.governance-table)
- (create-table tellorflex.gov-guard)
-
  (free.tellorflex.constructor coin 43200 1 1 (* 10 (^ 10 18)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
  (free.governance.init-global tellorflex coin)
  ; Input governance address in tellorflex

@@ -7,15 +7,6 @@
 (load "../../tellorflex.pact")
 (load "../../testing/governance-mock.pact")
 
-; tellorflex(oracle) tables
-(create-table tellorflex.global-variables)
-(create-table tellorflex.reports)
-(create-table tellorflex.staker-details)
-(create-table tellorflex.reports-submitted-count)
-(create-table tellorflex.timestamps)
-(create-table tellorflex.governance-table)
-(create-table tellorflex.gov-guard)
-
 (create-table governance-mock.global)
 (create-table governance-mock.vote-table)
 (create-table governance-mock.vote-tally)

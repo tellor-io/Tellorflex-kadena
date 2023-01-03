@@ -77,11 +77,11 @@
   (defconst ONE_DAY 86400)
   (defconst GOV_ACCOUNT 'governance)
 
-  (defun init-global (oracle:module{free.i-flex} token:module{fungible-v2})
+  (defun init-global (oracle:module{free.i-flex} token:module{fungible-v2} team-multisig:string)
     (insert global 'global-vars
       { 'oracle: oracle
       , 'token: token
-      , 'team-multisig: ""
+      , 'team-multisig: team-multisig
       , 'vote-count: 0
       , 'autopay-query-id: ""})
 
@@ -593,3 +593,20 @@
 
   (defun get-user-tips:integer (user:string) 0 )
 )
+; *****************************************************************************
+; *                                                                           *
+; *                         Initialize                                        *
+; *                                                                           *
+; *****************************************************************************
+
+(if (read-msg "upgrade")
+ ["upgrade"]
+ [
+  (create-table dispute-info)
+  (create-table vote-info)
+  (create-table vote-rounds)
+  (create-table open-disputes-on-id)
+  (create-table global)
+  (create-table dispute-ids-by-reporter)
+  (create-table vote-tally-by-address)
+ ])
