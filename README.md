@@ -66,7 +66,7 @@ This repository is maintained by the [Tellor team](https://github.com/orgs/tello
 
 ## How to Contribute<a name="how2contribute"> </a>  
 Join our Discord:
-[<img src="./public/discord.png" width="24" height="24">](https://discord.gg/E5y6SZ8UV8)
+[<img src="./public/discord.png" width="24" height="24">](https://discord.com/invite/n7drGjh)
 
 Check out our issues log here on Github or feel free to reach out anytime [info@tellor.io](mailto:info@tellor.io)
 
