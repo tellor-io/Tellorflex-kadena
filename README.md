@@ -14,28 +14,40 @@
 
 ## Tellorflex-kadena <a name="sample"> </a>
 
-Follow instructions in the pact repository of the Kadena org github to install the pact interpeter [Pact](https://github.com/kadena-io/pact#installing-pact). Atom code editor has the best tools as far as code editors go [here](https://github.com/kadena-io/pact#atom).
+Follow instructions in the pact repository of the Kadena org github to install the pact interpeter [Here](https://github.com/kadena-io/pact#installing-pact). Although the atom code editor is no longer maintained, it has great tools far writing code in Pact [check here for instructions](https://github.com/kadena-io/pact#atom). Checkout the [devnet-playground](./devnet-playground) folder for a full installation and contract interaction using nix package manager on linux that includes a pact install among other packages.  Step by step instructions are provided for an easy install on ubuntu 22.04. 
 
-## Usage
-Once the pact interperter is installed you can clone this repo and cd into the tellorflex-kadena directory. Type pact on your terminal to enter the pact interpeter environment load the tellorflex.pact file to see the test in action.
+## Tests
+After cloning repo and installing the pact interpeter you can run tests in this folder [tests](./tests). 
 ```cli
-git clone https://github.com/tellor-io/Tellorflex-kadena.git
-cd tellorflex-kadena
+# Example running a file in the interpeter
+# enter the pact interpeter
 pact
-(load "tests/tellorflex/tellorflex.repl" true)
-<!-- end to end tests are currently being added! -->
+
+# run a test (if not set to true the test will persist causing it to fail on the second run)
+(load "tests/tellorflex/e2e-1.repl" true)
 ```
-## Oracle
 
-A basic tellor implementation that is still a work in progress.  
-Functions included currently:
+## Modules
 
-```cli
-- depositStake
-- submitValue
-- retrieveValue
-- getDataBefore
-- requestStakeWithdrawal
-- withdrawStake
-
+### Tellorflex
+- #### Reporters
+```lisp
+(defun deposit-stake (staker:string guard:guard amount:integer) )
+(defun submit-value (query-id:string value:string nonce:integer query-data:string staker:string) )
+(defun request-staking-withdraw (staker:string amount:integer) )
+(defun withdraw-stake (staker:string) )
 ```
+- #### Users
+```lisp
+(defun get-data-before (query-id:string timestamp:integer) )
+(defun retrieve-data (query-id:string timestamp:integer) )
+```
+### Governance
+- #### Begin a dispute
+```lisp
+(defun begin-dispute (account:string query-id:string timestamp:integer) )
+(defun execute-vote (dispute-id:integer) )
+(defun tally-votes (dispute-id:integer) )
+(defun vote (dispute-id:integer supports:bool invalid:bool voter-account:string) )
+```
+
