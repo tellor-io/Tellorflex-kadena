@@ -1,0 +1,27 @@
+networkId: development
+type: exec
+code: (free.tellorflex.deposit-stake (read-msg "reporter") (read-keyset "reporter1") (read-integer "stake"))
+
+data:
+  reporter: reporter1
+  reporter1:
+    keys:
+      - 868bc442a6a2b24bd0b194bcfb2f4eed449763e157ae04c00d0ba405f59ea911
+    pred: keys-all
+  stake: 100000000000000000000
+signers:
+  - public: 868bc442a6a2b24bd0b194bcfb2f4eed449763e157ae04c00d0ba405f59ea911
+    caps:
+      - name: coin.TRANSFER
+        args: ["reporter1", "tellorflex", 1000.0]
+      - name: coin.GAS
+        args: []
+      - name: free.tellorflex.STAKER
+        args: ["reporter1"]
+publicMeta:
+  chainId: '0'
+  sender: reporter1
+  gasLimit: 150000
+  gasPrice: 1.e-7
+  ttl: 600
+

@@ -1,0 +1,125 @@
+# https://numtide.github.io/devshell
+
+# Tellor Contracts
+
+[[commands]]
+name = "deploy-interfaces"
+category = "01 Interface"
+command = """
+  cd $(git rev-parse --show-toplevel)/devnet-playground/scripts
+  echo "./scripts/run-deploy-interfaces.js"
+  ./run-deploy-interfaces.js
+  """
+help = "Init admin account and deploy interfaces (iflex & igovernance)"
+
+[[commands]]
+name = "governance-deploy"
+category = "02 Governance"
+command = """
+  cd $(git rev-parse --show-toplevel)/devnet-playground/scripts
+  echo "./scripts/run-deploy-governance.js"
+  ./run-deploy-governance.js
+  """
+help = "Deploy the governance contract to devnet"
+
+[[commands]]
+name = "tellorflex-deploy"
+category = "03 tellorflex"
+command = """
+  cd $(git rev-parse --show-toplevel)/devnet-playground/scripts
+  echo "./scripts/run-deploy-tellorflex.js"
+  ./run-deploy-tellorflex.js
+  """
+help = "Deploy the tellorflex contract to devnet"
+
+[[commands]]
+name = "init-module"
+category = "04 Initialize modules"
+command = """
+  cd $(git rev-parse --show-toplevel)/devnet-playground/scripts
+  echo "./scripts/init.js"
+  ./init.js
+  """
+help = "init the modules to start reporting"
+
+[[commands]]
+name = "deposit-stake"
+category = "05 deposit stake"
+command = """
+  cd $(git rev-parse --show-toplevel)/devnet-playground/scripts
+  echo "./scripts/deposit-stake.js"
+  ./deposit-stake.js
+  """
+help = "Deposit stake"
+
+[[commands]]
+name = "call-module"
+category = "06 Call Module"
+command = """
+  cd $(git rev-parse --show-toplevel)/devnet-playground/scripts
+  ./run-request.js $@
+  """
+help = "make calls to module"
+
+# Devnet
+
+[[commands]]
+name = "devnet-start"
+category = "devnet"
+command = """
+  cd $(git rev-parse --show-toplevel)/devnet-playground/devnet/
+  echo "Starting devnet (takes about 60 seconds...)"
+  git submodule update --init
+  docker compose pull
+  docker compose -f docker-compose.minimal.yaml up --detach --remove-orphans
+  """
+help = "Start the devnet blockchain simulator"
+
+[[commands]]
+name = "devnet-clean"
+category = "devnet"
+command = """
+  cd $(git rev-parse --show-toplevel)/devnet-playground/devnet
+  docker compose -f docker-compose.minimal.yaml down
+  sudo rm -rf db
+  """
+help = "Stop the devnet blockchain simulator and reset the database."
+
+[[commands]]
+name = "devnet-stop"
+category = "devnet"
+command = "sudo docker compose -f $(git rev-parse --show-toplevel)/devnet-playground/devnet/docker-compose.minimal.yaml down"
+help = "Stop the devnet blockchain simulator"
+
+# Tools
+
+[[commands]]
+package = "nodejs-16_x"
+category = "tools"
+name = "node"
+help = "The Node runtime and NPM package manager"
+
+[[commands]]
+package = "pact"
+category = "tools"
+name = "pact"
+help = "The Pact programming language"
+
+[[commands]]
+package = "nodePackages.pnpm"
+category = "tools"
+name = "pnpm"
+help = "The performant node package manager"
+
+[[commands]]
+package = "z3"
+category = "tools"
+name = "z3"
+help = "The Z3 theorem prover"
+
+# Shell
+
+[devshell]
+name = "tellor"
+motd = "{202}🔨 Welcome to the devnet playground!{reset}\n$(type -p menu &>/dev/null && menu)\n"
+

@@ -1,0 +1,4 @@
+code: (describe-module "free.i-governance")
+publicMeta:
+  chainId: "0"
+  gasLimit: 600

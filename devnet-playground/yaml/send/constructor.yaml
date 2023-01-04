@@ -1,0 +1,28 @@
+networkId: "development"
+type: exec
+
+code: (free.tellorflex.constructor coin (read-integer "reporting-lock") (read-integer "stake-amount-dollar-target") (read-integer "staking-token-price") (read-integer "minimum-stake-amount") (read-string "staking-token-price-query-id"))
+
+data:
+  reporting-lock: 43200
+  stake-amount-dollar-target: 500000000000000000000
+  staking-token-price: 12150000000000000000
+  minimum-stake-amount: 100000000000000000000
+  staking-token-price-query-id: "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4"
+
+signers:
+  - public: 45f38e8427a5ebb603443d12a638e891fca410b1fd25b15ba39b9d26e0093844
+
+    caps:
+      - name: "free.tellorflex.TELLOR"
+        args: []
+      - name: "coin.GAS"
+        args: []
+
+publicMeta:
+  chainId: "0"
+  sender: "tellor-admin-keyset"
+
+  gasLimit: 150000
+  gasPrice: 0.0000001
+  ttl: 150000

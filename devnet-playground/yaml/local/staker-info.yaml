@@ -1,0 +1,4 @@
+code: (free.tellorflex.get-staker-info "reporter1")
+publicMeta:
+  chainId: "0"
+  gasLimit: 600

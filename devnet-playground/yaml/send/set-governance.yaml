@@ -1,0 +1,22 @@
+networkId: "development"
+type: exec
+
+code: (free.governance.call-tellorflex)
+
+signers:
+  - public: 45f38e8427a5ebb603443d12a638e891fca410b1fd25b15ba39b9d26e0093844
+
+    caps:
+      - name: "free.governance.TELLOR-GOV"
+        args: []
+      - name: "coin.GAS"
+        args: []
+
+publicMeta:
+  chainId: "0"
+  sender: "tellor-admin-keyset"
+
+  gasLimit: 150000
+  gasPrice: 0.0000001
+  ttl: 600
+

@@ -1,0 +1,4 @@
+[submodule "devnet-playground/devnet"]
+	path = devnet-playground/devnet
+	url = https://github.com/kadena-io/devnet
+ignore = untracked

@@ -1,0 +1,28 @@
+networkId: "development"
+type: "exec"
+
+codeFile: "../../../i-governance.pact"
+
+data:
+  tellor-admin-keyset:
+
+    keys:
+      - "45f38e8427a5ebb603443d12a638e891fca410b1fd25b15ba39b9d26e0093844"
+    pred: "keys-all"
+
+  upgrade: false
+
+signers:
+
+  - public: "45f38e8427a5ebb603443d12a638e891fca410b1fd25b15ba39b9d26e0093844"
+
+publicMeta:
+  chainId: "0"
+
+  sender: "tellor-admin-keyset"
+
+  gasLimit: 85
+
+  gasPrice: 0.0000001
+  ttl: 600
+
