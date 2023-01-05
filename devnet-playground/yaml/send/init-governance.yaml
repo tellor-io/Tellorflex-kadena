@@ -1,7 +1,7 @@
 networkId: "development"
 type: exec
 
-code: (free.governance.init-global free.tellorflex coin "tellor-team")
+code: (free.governance.constructor "governance" free.tellorflex coin "tellor-team")
 
 signers:
   - public: 45f38e8427a5ebb603443d12a638e891fca410b1fd25b15ba39b9d26e0093844

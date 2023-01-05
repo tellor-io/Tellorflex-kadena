@@ -1,7 +1,7 @@
 networkId: "development"
 type: exec
 
-code: (free.tellorflex.constructor coin (read-integer "reporting-lock") (read-integer "stake-amount-dollar-target") (read-integer "staking-token-price") (read-integer "minimum-stake-amount") (read-string "staking-token-price-query-id"))
+code: (free.tellorflex.constructor "tellorflex" coin (read-integer "reporting-lock") (read-integer "stake-amount-dollar-target") (read-integer "staking-token-price") (read-integer "minimum-stake-amount") (read-string "staking-token-price-query-id"))
 
 data:
   reporting-lock: 43200
