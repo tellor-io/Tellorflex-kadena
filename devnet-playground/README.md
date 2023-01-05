@@ -85,10 +85,10 @@ devnet-start
 deploy-interfaces
 
 # deploy governance contract
-deploy-governance
+governance-deploy
 
 # deploy tellorflex contract
-deploy-tellorflex
+tellorflex-deploy
 
 # initialize both tellorflex and governance
 init-module
