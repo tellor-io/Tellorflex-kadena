@@ -1,4 +1,5 @@
 ; tellor governance on kadena
+; read namespace from deploy msg  
 (namespace (read-msg 'ns))
 
 (if (read-msg "upgrade")
@@ -19,7 +20,6 @@
 
   (defcap PRIVATE () true )
 
-  ; TODO:
   (defun capping:bool () (require-capability (PRIVATE)) )
 
   (defun create-gov-guard:guard () (create-user-guard (capping)) )
@@ -76,9 +76,8 @@
   (defconst TWELVE_HOURS 43200)
   (defconst ONE_DAY 86400)
 
-;
   (defun constructor:string (
-    oracle ;:module{free.i-flex}
+    oracle:module{free.i-flex}
     token:module{fungible-v2}
     team-multisig:string
     gov-account-name:string)
@@ -93,8 +92,9 @@
     (token::create-account gov-account-name (create-gov-guard))
     "Global variables set!"
   )
-;
+
   (defun register-gov-guard:string ()
+    @doc "Registers the gov guard with the oracle"
     (let ((tellorflex:module{i-flex} (at 'oracle (read global 'global-vars))))
       (with-capability (TELLOR-GOV)
         (tellorflex::init-gov-guard (create-gov-guard))
@@ -103,7 +103,7 @@
   )
 
   (defun begin-dispute:string (account:string query-id:string timestamp:integer)
-    @doc "Initializes a dispute/vote in the system"
+    @doc "Begins a dispute for a given query id and timestamp"
     (enforce-keyset (read-keyset account))
     (let* ((tellorflex:module{i-flex} (at 'oracle (read global 'global-vars)))
            (block-number (tellorflex::get-block-number-by-timestamp query-id timestamp))
@@ -114,70 +114,53 @@
            (disputed-reporter (tellorflex::get-reporter-by-timestamp query-id timestamp)))
         (enforce (!= block-number 0)
           (format "No value exists at given timestamp {}"[block-number]))
+        ;  reads dispute ids list from vote-rounds table
+        ;  checking for existing disputes for the given query id and timestamp
         (with-default-read vote-rounds hash
           { 'dispute-ids: []} { 'dispute-ids := dispute-ids }
-          (let ((disputes (+ 1 (length dispute-ids))))
+          (let ((vote-round (+ 1 (length dispute-ids))))
           (with-capability (PRIVATE)
-            (if (= disputes 1)
+          ;  if no disputes exist for this report then create a new vote round
+            (if (= vote-round 1)
+            ;  read open disputes on id to calculate fee
               (with-default-read open-disputes-on-id query-id
                 { 'open-disputes-on-id: 0 } { 'open-disputes-on-id := open-disputes }
                 (enforce (< (- block-time timestamp) TWELVE_HOURS)
                   "Dispute must be started within reporting lock time")
                 (let ((fee (* dispute-fee (^ 2 open-disputes)))
                       (token:module{fungible-v2} (token)))
+                    ;  transfer fee to gov account
                     (token::transfer account (gov-account) (float fee))
+                    ;  insert dispute info into dispute-info table
                     (insert dispute-info (str dispute-id)
                       { 'query-id: query-id
                       , 'timestamp: timestamp
                       , 'value: (tellorflex::retrieve-data query-id timestamp)
                       , 'disputed-reporter: disputed-reporter
                       , 'slashed-amount:
-                        (tellorflex::slash-reporter disputed-reporter (gov-account))
+                        (tellorflex::slash-reporter disputed-reporter (gov-account)) ; slash reporter and transfer stake to gov account
                       })
+                    ;  set report value to empty string in oracle
                     (tellorflex::remove-value query-id timestamp)
-                    (insert vote-info (str dispute-id)
-                      { 'identifier-hash: hash
-                      , 'vote-round: disputes
-                      , 'start-date: block-time
-                      , 'block-number: (at 'block-height (chain-data))
-                      , 'fee: fee
-                      , 'tally-date: 0
-                      , 'token-holders: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-                      , 'users: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-                      , 'reporters: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-                      , 'team-multisig: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-                      , 'executed: false
-                      , 'result: ""
-                      , 'initiator: account
-                      , 'voters: []
-                      })
+                    ;  insert vote info into vote-info table
+                    (insert-vote-info (str dispute-id) hash vote-round block-time fee account)
+                    ; increment open disputes on id by 1  
                     (write open-disputes-on-id query-id
                       { 'open-disputes-on-id: (+ open-disputes 1)})
                   )
                 )
+                ;  if a dispute already exists for this report then create a new dispute round
                 (let ((prev-tally-date
-                        (at 'tally-date (read vote-info (str (at (- disputes 2) dispute-ids)))))
+                        (at 'tally-date (read vote-info (str (at (- vote-round 2) dispute-ids)))))
                       (fee (* dispute-fee (^ 2 (length dispute-ids))))
                       (token:module{fungible-v2} (token)))
                     (enforce (< (- block-time prev-tally-date) ONE_DAY)
                       "New dispute round must be started within a day")
+                    ;  transfer fee to gov account
                     (token::transfer account (gov-account) (float fee))
-                    (insert vote-info (str dispute-id)
-                      { 'identifier-hash: hash
-                      , 'vote-round: disputes
-                      , 'start-date: block-time
-                      , 'block-number: (at 'block-height (chain-data))
-                      , 'fee: fee
-                      , 'tally-date: 0
-                      , 'token-holders: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-                      , 'users: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-                      , 'reporters: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-                      , 'team-multisig: {'does-support: 0, 'against: 0, 'invalid-query: 0}
-                      , 'executed: false
-                      , 'result: ""
-                      , 'initiator: account
-                      , 'voters: []
-                      })
+                    ;  insert vote info into vote-info table
+                    (insert-vote-info (str dispute-id) hash vote-round block-time fee account)
+                    ; read slashed amount and value from first round dispute  
                     (with-read dispute-info (str (at 0 dispute-ids))
                       { 'slashed-amount := slashed-amount , 'value := value }
                       (insert dispute-info (str dispute-id)
@@ -190,12 +173,14 @@
                 )
               )
             )
+            ;  add this round's dispute id to list of dispute ids for this report
             (write vote-rounds hash { 'dispute-ids: (+ dispute-ids [dispute-id])})
+            ;  add this dispute id to list of dispute ids for disputed reporter
             (with-default-read dispute-ids-by-reporter disputed-reporter
               { 'dispute-ids: [] }{ 'dispute-ids := dispute-ids }
               (write dispute-ids-by-reporter disputed-reporter
                 { 'dispute-ids: (+ dispute-ids [dispute-id])}))
-
+            ;  increment global vote count
             (with-read global 'global-vars { 'vote-count := vote-count }
               (update global 'global-vars { 'vote-count: (+ vote-count 1)}))
           )
@@ -204,6 +189,7 @@
   )
 
   (defun execute-vote:string (dispute-id:integer)
+    @doc "Execute vote for a given dispute ID, finalizing the vote and transferring the fees and stake"
     (let ((vote-count (at 'vote-count (read global 'global-vars))))
       (enforce (and (<= dispute-id vote-count) (> dispute-id 0))
         "Dispute ID must be valid"))
@@ -217,16 +203,19 @@
       (enforce (not executed) "Vote has already been executed")
       (enforce (> tally-date 0) "Vote must be tallied")
       (with-read vote-rounds identifier-hash { 'dispute-ids := dispute-ids }
-        (enforce (= (length dispute-ids) vote-round) "Must be the final vote")
+        (enforce (= (length dispute-ids) vote-round) "Must be the final vote round")
         (enforce (>= (- (block-time) tally-date) ONE_DAY)
           "1 day has to pass after tally to allow for disputes")
+        ;  update vote info to show that vote has been executed
         (update vote-info (str dispute-id) { 'executed: true })
 
       (let* ((query-id (at 'query-id (read dispute-info (str dispute-id))))
              (open-disputes-count
                (at 'open-disputes-on-id (read open-disputes-on-id query-id)))
              (token:module{fungible-v2} (at 'token (read global 'global-vars))))
+             
           (with-capability (PRIVATE)
+          ; transfer stake and fees to appropriate parties given the result of the vote
             (if (= result 'PASSED)
                 (fold
                   (vote-passed) identifier-hash
@@ -239,10 +228,12 @@
                     (fold
                       (vote-invalid) identifier-hash
                       (enumerate (length dispute-ids) 1))
+                    ; transfer slashed amount to disputed reporter
                     (token::transfer (gov-account) disputed-reporter (float slashed-amount))
                     )
 
                     (if (= result 'FAILED)
+                    ;  transfer fees and slashed amount to disputed reporter
                       (let ((reporter (at 'disputed-reporter (read dispute-info (str dispute-id))))
                         (amount
                           (float (+
@@ -258,6 +249,7 @@
           )
         )
       )
+    ;  decrement open disputes count for this query
     (update open-disputes-on-id query-id
       { 'open-disputes-on-id: (- open-disputes-count 1) })
      )
@@ -346,7 +338,7 @@
              (reports-submitted (try 0
                (tellorflex::get-reports-submitted-by-address voter-account)))
              (voter-balance
-               ; TODO: voter doesn't have to be staker could just holder
+
                (if (= {} voter-stake-info) (round (* (token::get-balance voter-account) (^ 10 18)))
                    (fold (+) 0 [
                    (round (* (token::get-balance voter-account) (^ 10 18)))
@@ -460,6 +452,7 @@
   ; *                                                                           *
   ; *****************************************************************************
   (defun vote-passed (hash:string idx:integer)
+  @doc "Internal helper function to transfer fee and stake to initiator and fee only to other disputers"
     (require-capability (PRIVATE))
     (let* ((vote-round (at 'dispute-ids (read vote-rounds hash)))
            (vote-id (at (- idx 1) vote-round)))
@@ -483,6 +476,7 @@
 
 )
   (defun vote-invalid (hash:string idx:integer)
+    @doc "Internal helper function to transfer fee to each dispute round initiator"
     (require-capability (PRIVATE))
     (let* ((vote-round (at 'dispute-ids (read vote-rounds hash)))
            (vote-id (at (- idx 1) vote-round))
@@ -498,6 +492,7 @@
   )
 
   (defun vote-failed (num1:integer dispute-id:integer)
+    @doc "Sum the fee of each round"    
     (require-capability (PRIVATE))
     (with-read vote-info (str dispute-id) { 'fee := fee }
       (+ num1 fee))
@@ -507,7 +502,24 @@
   ; *                 (vote) helpers                                            *
   ; *                                                                           *
   ; *****************************************************************************
-
+  (defun insert-vote-info (dispute-id:string hash:string vote-round:integer block-time:integer  fee:integer initiator:string)
+    (require-capability (PRIVATE))
+    (insert vote-info dispute-id
+      { 'identifier-hash: hash
+      , 'vote-round: vote-round
+      , 'start-date: block-time
+      , 'block-number: (at 'block-height (chain-data))
+      , 'fee: fee
+      , 'tally-date: 0
+      , 'token-holders: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+      , 'users: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+      , 'reporters: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+      , 'team-multisig: {'does-support: 0, 'against: 0, 'invalid-query: 0}
+      , 'executed: false
+      , 'result: ""
+      , 'initiator: initiator
+      , 'voters: []
+      }))
   (defun calculate-vote-to-scale (votes vote-sum)
     ( / (* votes (^ 10 18)) vote-sum)
   )
