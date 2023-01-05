@@ -20,7 +20,7 @@
 (expect "Balance: 200.0" 200.0 (coin.get-balance "tellorflex"))
 (test-capability (coin.COINBASE))
 (test-capability (free.tellorflex.PRIVATE))
-(coin.coinbase "tellorflex" (free.tellorflex.create-guard) 100.0)
+(coin.coinbase "tellorflex" (free.tellorflex.create-flex-guard) 100.0)
 (expect "to withdraw amount should be 100*e18" (* 100 (^ 10 18)) (free.tellorflex.to-withdraw))
 (free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (* 100 (^ 10 18)))
 ; advance time

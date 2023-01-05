@@ -1,4 +1,4 @@
-(namespace "free")
+(namespace (read-msg 'ns))
 (interface i-flex
 
   (defun init-gov-guard:string (guard:guard))

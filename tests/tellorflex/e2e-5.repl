@@ -34,7 +34,7 @@
 (expect "Balance: 200.0" 200.0 (coin.get-balance "tellorflex"))
 (test-capability (coin.COINBASE))
 (test-capability (free.tellorflex.PRIVATE))
-(coin.coinbase "tellorflex" (free.tellorflex.create-guard) 100.0)
+(coin.coinbase "tellorflex" (free.tellorflex.create-flex-guard) 100.0)
 (expect "Balance should be 300.0" 300.0 (coin.get-balance "tellorflex"))
 ; advance time
 (env-chain-data {'block-time: (time "1970-01-03T00:00:02Z")})

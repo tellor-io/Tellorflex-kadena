@@ -6,7 +6,7 @@
 (define-namespace "free" (read-keyset "test-keyset") (read-keyset "namespace-keyset"))
 (commit-tx)
 
-(env-data {})
+(env-data {'ns: "free"})
 
 (begin-tx) ;txn 1
 (load "../root/fungible-v2.pact")

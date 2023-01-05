@@ -1,5 +1,5 @@
 (load "../setup.repl")
-(env-data { "tellor-admin-keyset": { "keys": [ "tellor-keyset-public-key" ], "pred": "keys-all" }, "upgrade": false })
+(env-data { "tellor-admin-keyset": { "keys": [ "tellor-keyset-public-key" ], "pred": "keys-all" }, "upgrade": false, "ns": "free" })
 (env-sigs [{"key": "tellor-keyset-public-key", "caps": []}])
 (env-chain-data {'block-time: (time "2022-12-21T21:26:41Z"), 'block-height: 1})
 
@@ -7,11 +7,11 @@
 (load "../../tellorflex.pact")
 (load "../../governance.pact")
 
- (free.tellorflex.constructor coin 43200 1 1 (* 10 (^ 10 18)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
- (free.governance.init-global tellorflex coin "")
+ (free.tellorflex.constructor "tellorflex" coin 43200 1 1 (* 10 (^ 10 18)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
+ (free.governance.constructor tellorflex coin "" "governance")
  ; Input governance address in tellorflex
- (free.tellorflex.init free.governance)
- (free.governance.call-tellorflex)
+ (free.tellorflex.init governance)
+ (free.governance.register-gov-guard)
  (commit-tx)
  (env-sigs [])
  (env-data {})
