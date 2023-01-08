@@ -1,4 +1,4 @@
-(load "tellorflex-setup.repl" )
+(load "../tellorflex-setup.repl" )
 
 (env-sigs [])
 (env-data {})

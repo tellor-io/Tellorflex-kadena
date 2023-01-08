@@ -1,4 +1,4 @@
-(load "tellorflex-setup.repl" )
+(load "../tellorflex-setup.repl" )
 
 (env-data { "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" }, "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" } })
 (env-sigs [{"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 300.0)]},{"key": "reporter1-public-key", "caps": []}])
