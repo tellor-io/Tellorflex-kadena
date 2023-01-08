@@ -44,7 +44,8 @@
 (coin.coinbase "account3" (describe-keyset "free.account3") 3.0)
 (coin.coinbase "account4" (describe-keyset "free.account4") 1.0)
 (commit-tx)
-(begin-tx "test vote weight outcomes")
+(begin-tx "Test vote weight outcomes")
+(print "Test vote weight outcomes")
 (free.tellorflex.deposit-stake
   "account10"
   (describe-keyset "free.account10")

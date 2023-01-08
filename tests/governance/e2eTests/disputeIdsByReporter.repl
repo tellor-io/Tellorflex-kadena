@@ -15,6 +15,7 @@
   {"key": "reporter2-public-key", "caps": []}])
 
 (begin-tx "Test array of dispute ids by reporter address")
+(print "Test array of dispute ids by reporter address")
 (free.tellorflex.deposit-stake
   "reporter1-keyset"
   (describe-keyset "free.reporter1-keyset")

@@ -12,6 +12,7 @@
   {"key": "reporter2-public-key", "caps": []}])
 
 (begin-tx "On multiple vote rounds, disputed value gets recorded correctly")
+(print "On multiple vote rounds, disputed value gets recorded correctly")
 
 (free.tellorflex.deposit-stake
   "reporter1-keyset"

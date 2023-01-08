@@ -12,6 +12,7 @@
   {"key": "reporter2-public-key", "caps": []}])
 
 (begin-tx "Test query id value after a dispute")
+(print "Test query id value after a dispute")
 (free.tellorflex.deposit-stake
   "reporter1-keyset"
   (describe-keyset "free.reporter1-keyset")

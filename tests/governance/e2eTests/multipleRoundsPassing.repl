@@ -33,6 +33,7 @@
   (coin.coinbase "account4" (describe-keyset "free.account4") 10.0)
   (commit-tx)
 (begin-tx "Test multiple vote rounds on a dispute, all passing")
+(print "Test multiple vote rounds on a dispute, all passing")
 (coin.transfer "account1" "account2" 100.0)
 (free.tellorflex.deposit-stake
   "account1"
