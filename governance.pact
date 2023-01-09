@@ -630,4 +630,14 @@
 ; *                         Initialize                                        *
 ; *                                                                           *
 ; *****************************************************************************
-
+(if (read-msg "upgrade")
+ ["upgrade"]
+ [
+  (create-table dispute-info)
+  (create-table vote-info)
+  (create-table vote-rounds)
+  (create-table open-disputes-on-id)
+  (create-table global)
+  (create-table dispute-ids-by-reporter)
+  (create-table vote-tally-by-address)
+ ])
