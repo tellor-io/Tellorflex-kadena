@@ -22,7 +22,7 @@ publicMeta:
 
   sender: "tellor-admin-keyset"
 
-  gasLimit: 85
+  gasLimit: 95
 
   gasPrice: 0.0000001
   ttl: 600
