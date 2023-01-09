@@ -13,6 +13,7 @@
   {"key": "reporter2-public-key", "caps": []}])
 
 (begin-tx "Test multiple vote rounds on a dispute, overturn result")
+(print "Test multiple vote rounds on a dispute, overturn result")
 (free.tellorflex.deposit-stake
   "reporter1-keyset"
   (describe-keyset "free.reporter1-keyset")

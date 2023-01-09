@@ -4,6 +4,7 @@ type: "exec"
 codeFile: "../../../i-governance.pact"
 
 data:
+  ns: "free"
   tellor-admin-keyset:
 
     keys:

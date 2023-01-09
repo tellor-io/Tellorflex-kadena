@@ -1,4 +1,4 @@
-(load "tellorflex-setup.repl")
+(load "../tellorflex-setup.repl")
 
 (env-data {})
 (env-sigs [])
@@ -12,7 +12,7 @@
 (begin-tx "TBR, stakes, and staking rewards can't borrow from each other")
 (test-capability (coin.COINBASE))
 (test-capability (free.tellorflex.PRIVATE))
-(coin.coinbase "tellorflex" (free.tellorflex.create-guard) 100.0)
+(coin.coinbase "tellorflex" (free.tellorflex.create-flex-guard) 100.0)
 (free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 100 (^ 10 18)))
 (free.tellorflex.add-staking-rewards "reporter2-keyset" 100.0)
 ; advance time 16 hour 40minutes = 60000 seconds
@@ -28,7 +28,7 @@
 (expect "totalStakeAmount should be 100" (* 100 (^ 10 18)) (free.tellorflex.total-stake-amount))
 (test-capability (coin.COINBASE))
 (test-capability (free.tellorflex.PRIVATE))
-(coin.coinbase "tellorflex" (free.tellorflex.create-guard) 100.0)
+(coin.coinbase "tellorflex" (free.tellorflex.create-flex-guard) 100.0)
 ; ; advance time 30 days
 (env-chain-data {'block-time: (free.h.advanceTime 2712000)})
 (chain-data)

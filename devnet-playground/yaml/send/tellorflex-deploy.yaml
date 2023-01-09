@@ -4,10 +4,7 @@ type: "exec"
 codeFile: "../../../tellorflex.pact"
 
 data:
-  reporter1:
-    keys:
-      - "868bc442a6a2b24bd0b194bcfb2f4eed449763e157ae04c00d0ba405f59ea911"
-    pred: "keys-all"
+  ns: "free"
 
   tellor-admin-keyset:
 

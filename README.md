@@ -59,6 +59,11 @@ pact
 ```lisp
 (defun vote (dispute-id:integer supports:bool invalid:bool voter-account:string) )
 ```
+##### Currently deployed module-names on chain 1
+* [free.tellorflexin](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=free.tellorflexin&chain=1)
+* [free.governance-v2](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=free.governance-v2&chain=1)
+* [free.i-flex](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=free.i-flex&chain=1)
+* [free.i-governance](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=free.i-governance&chain=1)
 
 ## Maintainers <a name="maintainers"> </a>
 This repository is maintained by the [Tellor team](https://github.com/orgs/tellor-io/people)

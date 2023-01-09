@@ -6,7 +6,7 @@
 (define-namespace "free" (read-keyset "test-keyset") (read-keyset "namespace-keyset"))
 (commit-tx)
 
-(env-data {})
+(env-data {'ns: "free"})
 
 (begin-tx) ;txn 1
 (load "../root/fungible-v2.pact")
@@ -90,7 +90,7 @@
 (commit-tx)
 
 (env-gasmodel "table")
-(env-gaslimit 160000)
+(env-gaslimit 160500)
 
 (print "----------")
 (print "'reporter1' account created:\n  - keyset: 'reporter1-keyset'\n  - public key: 'reporter1-public-key'\n  - balance: 1000.0 KDA")

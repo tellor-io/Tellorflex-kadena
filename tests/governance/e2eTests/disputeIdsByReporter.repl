@@ -15,6 +15,7 @@
   {"key": "reporter2-public-key", "caps": []}])
 
 (begin-tx "Test array of dispute ids by reporter address")
+(print "Test array of dispute ids by reporter address")
 (free.tellorflex.deposit-stake
   "reporter1-keyset"
   (describe-keyset "free.reporter1-keyset")
@@ -39,10 +40,9 @@
   (- (free.h.blockTime) 1))
 
 (let* ((reporter-disputes
-        (free.governance.get-disputes-by-reporter "reporter1-keyset"))
-       (dispute-ids (at 'dispute-ids reporter-disputes)))
-     (expect "Should be one dispute id" 1 (length dispute-ids))
-     (expect  "Dispute id should be correct" 1 (at 0 dispute-ids))
+        (free.governance.get-disputes-by-reporter "reporter1-keyset")) )
+     (expect "Should be one dispute id" 1 (length reporter-disputes))
+     (expect  "Dispute id should be correct" 1 (at 0 reporter-disputes))
 )
 (expect-failure "row not found: reporter2-keyset"
   (free.governance.get-disputes-by-reporter "reporter2-keyset"))
@@ -53,10 +53,9 @@
   (hash (base64-encode "{SpotPrice: [eth,usd]}"))
   (free.h.blockTime))
 (let* ((reporter-disputes
-        (free.governance.get-disputes-by-reporter "reporter2-keyset"))
-       (dispute-ids (at 'dispute-ids reporter-disputes)))
-     (expect "Should be one dispute id" 1 (length dispute-ids))
-     (expect  "Dispute id should be correct" 2 (at 0 dispute-ids))
+        (free.governance.get-disputes-by-reporter "reporter2-keyset")) )
+     (expect "Should be one dispute id" 1 (length reporter-disputes))
+     (expect  "Dispute id should be correct" 2 (at 0 reporter-disputes))
 )
 (env-chain-data {'block-time: (free.h.advanceTime (* 86400 2))})
 (free.governance.tally-votes 1)
@@ -68,11 +67,10 @@
   (- (- (free.h.blockTime) (* 86400 2)) 1))
 
 (let* ((reporter-disputes
-        (free.governance.get-disputes-by-reporter "reporter1-keyset"))
-      (dispute-ids (at 'dispute-ids reporter-disputes)))
-     (expect "Should be one dispute id" 2 (length dispute-ids))
-     (expect  "Dispute id should be correct" 1 (at 0 dispute-ids))
-     (expect  "Dispute id should be correct" 3 (at 1 dispute-ids))
+        (free.governance.get-disputes-by-reporter "reporter1-keyset")) )
+     (expect "Should be one dispute id" 2 (length reporter-disputes))
+     (expect  "Dispute id should be correct" 1 (at 0 reporter-disputes))
+     (expect  "Dispute id should be correct" 3 (at 1 reporter-disputes))
 )
 (env-chain-data {'block-time: (free.h.advanceTime 3)})
 (free.tellorflex.submit-value
