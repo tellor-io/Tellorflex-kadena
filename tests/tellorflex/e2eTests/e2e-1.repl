@@ -43,7 +43,7 @@
 (env-chain-data {'block-time: (time "1970-01-02T00:00:00Z")})
 (begin-tx "TBR should not borrow from staking rewards")
 (free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (* 100 (^ 10 18)))
-(free.tellorflex.add-staking-rewards "reporter1-keyset" 150.0)
+(free.tellorflex.add-staking-rewards "reporter1-keyset" (free.h.precision 150))
 (expect "Balance should be 250.0" 250.0 (coin.get-balance "tellorflex"))
 (expect "stakingRewardsBalance" (* 150 (^ 10 18)) (free.tellorflex.staking-rewards-balance))
 (env-chain-data {'block-time: (time "1970-01-03T12:00:00Z")})

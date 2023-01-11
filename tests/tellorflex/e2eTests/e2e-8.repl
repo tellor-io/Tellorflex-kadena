@@ -14,7 +14,7 @@
 (test-capability (free.tellorflex.PRIVATE))
 (coin.coinbase "tellorflex" (free.tellorflex.create-flex-guard) 100.0)
 (free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 100 (^ 10 18)))
-(free.tellorflex.add-staking-rewards "reporter2-keyset" 100.0)
+(free.tellorflex.add-staking-rewards "reporter2-keyset" (free.h.precision 100))
 ; advance time 16 hour 40minutes = 60000 seconds
 (env-chain-data {'block-time: (free.h.advanceTime 60000)})
 (free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [trb,usd]}")) (base64-encode "420") 0 (base64-encode "{SpotPrice: [trb,usd]}")  "reporter2-keyset")
@@ -41,7 +41,7 @@
 (free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 5 (^ 10 17)))
 (expect "timeBasedRewardsBalance balance should be 100" (* 100 (^ 10 18)) (free.tellorflex.get-total-time-based-rewards-balance))
 (expect "totalStakeAmount should be 101" (* 101 (^ 10 18)) (free.tellorflex.total-stake-amount))
-(free.tellorflex.add-staking-rewards "reporter2-keyset" 100.0)
+(free.tellorflex.add-staking-rewards "reporter2-keyset" (free.h.precision 100))
 (commit-tx)
 (begin-tx)
 (env-chain-data {'block-time: (free.h.advanceTime 2712000)})

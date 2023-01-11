@@ -16,7 +16,7 @@
 (expect "0" 0 (free.tellorflex.staking-rewards-balance))
 (expect "0" 0 (free.tellorflex.reward-rate))
 ; add staking rewards
-(free.tellorflex.add-staking-rewards "user-keyset" 1000.0)
+(free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1000))
 ; check conditions after adding rewards
 (expect "1000" (* 1000 (^ 10 18)) (free.tellorflex.staking-rewards-balance))
 (expect "0" 0 (free.tellorflex.total-reward-debt))

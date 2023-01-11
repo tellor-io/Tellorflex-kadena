@@ -31,3 +31,4 @@
   (free.tellorflex.get-total-time-based-rewards-balance))
 (expect "toWithdraw should be 0" 0
   (free.tellorflex.to-withdraw))
+  (free.h.precision 100)

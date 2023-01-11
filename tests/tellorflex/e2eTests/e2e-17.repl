@@ -25,7 +25,7 @@
 )
 (expect "totalRewardDebt 0" 0 (free.tellorflex.total-reward-debt))
 ; add staking rewards
-(free.tellorflex.add-staking-rewards "user-keyset" 1000.0)
+(free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1000))
 (let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
        (expectedRewardRate (/ (free.h.precision 1000) REWARD_RATE_TARGET)))
        (expect "rewardRate 10" expectedRewardRate (free.tellorflex.reward-rate))

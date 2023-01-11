@@ -16,7 +16,7 @@
 
 (begin-tx "what happens to staking rewards of non-voter?")
 (free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (free.h.precision 100))
-(free.tellorflex.add-staking-rewards "reporter5-keyset" 1000.0)
+(free.tellorflex.add-staking-rewards "reporter5-keyset" (free.h.precision 1000))
 (env-chain-data {'block-time: (free.h.advanceTime 1)})
 (free.governance-mock.begin-dispute "reporter1-keyset" "" 0)
 (free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (free.h.precision 100))

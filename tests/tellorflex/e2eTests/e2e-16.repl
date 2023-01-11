@@ -33,7 +33,7 @@
 (free.governance-mock.vote 2 false false "reporter2-keyset")
 (free.governance-mock.vote 3 false false "reporter2-keyset")
 ; add staking rewards
-(free.tellorflex.add-staking-rewards "user-keyset" 1000.0)
+(free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1000))
 ; advance time
 (env-chain-data {'block-time: (free.h.advanceTime (* 86400 31))})
 ; request-withdraw
