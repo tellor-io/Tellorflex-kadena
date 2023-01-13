@@ -22,10 +22,10 @@
   {"key": "user-public-key", "caps": []},
   {"key": "reporter5-public-key", "caps": []}])
 
-(begin-tx "rewards go to zero, big reward added, staker stakes")
-
+(print "rewards go to zero, big reward added, staker stakes")
+(begin-tx)
 (free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (free.h.precision 100))
-(free.tellorflex.add-staking-rewards "reporter5-keyset" 1000.0)
+(free.tellorflex.add-staking-rewards "reporter5-keyset" (free.h.precision 1000))
 (env-chain-data {'block-time: (free.h.advanceTime 1)})
 (free.governance-mock.begin-dispute "user-keyset" "" 0)
 (free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (free.h.precision 100))
@@ -43,7 +43,7 @@
 (expect "reward rate should be 0" 0 (free.tellorflex.reward-rate))
 (commit-tx)
 (begin-tx)
-(free.tellorflex.add-staking-rewards "reporter5-keyset" 3000.0)
+(free.tellorflex.add-staking-rewards "reporter5-keyset" (free.h.precision 3000))
 (free.tellorflex.deposit-stake "reporter3-keyset" (describe-keyset "free.reporter3-keyset") (free.h.precision 100))
 (expect "staker 3 should have 0 TRB" 0.0 (coin.get-balance "reporter3-keyset"))
 ; advance time

@@ -7,7 +7,8 @@
 (env-sigs [
   {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 1000.0), (coin.TRANSFER "reporter2-keyset" "reporter1-keyset" 800.0)]},
   {"key": "reporter2-public-key", "caps": []}])
-(begin-tx "check stake amount given lower and upper bounds on TRB price")
+(print "check stake amount given lower and upper bounds on TRB price")
+(begin-tx)
 (let ((stake-amount (free.tellorflex.stake-amount))
       (minimum-stake-amount (free.tellorflex.minimum-stake-amount)))
     (expect "stake amount should be minimum stake amount 100" minimum-stake-amount stake-amount))
@@ -47,6 +48,6 @@
 (let ((stake-amount (free.tellorflex.stake-amount))
       (expected-stake-amount
         (/
-          (* (^ 10 18)(free.tellorflex.precision 500.0))
+          (* (^ 10 12)(free.tellorflex.precision 500.0))
           (free.tellorflex.precision 0.01))))
     (expect "stake amount should be minimum stake amount 50000" expected-stake-amount stake-amount))

@@ -10,129 +10,149 @@
   {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "tellorflex" 1000.0)]},
   {"key": "user-public-key", "caps": []},
   {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 1000.0)]},{"key": "reporter2-public-key", "caps": []}])
-(env-chain-data {'block-time: (time "1970-01-02T00:00:00Z")})
-(begin-tx "Realistic test with staking rewards and disputes")
+(print "Realistic test with staking rewards and disputes")
+(begin-tx)
 ; check initial conditions
 (expect "0" 0 (free.tellorflex.staking-rewards-balance))
 (expect "0" 0 (free.tellorflex.reward-rate))
 ; add staking rewards
-(free.tellorflex.add-staking-rewards "user-keyset" 1000.0)
+(free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1000))
 ; check conditions after adding rewards
-(expect "1000" (* 1000 (^ 10 18)) (free.tellorflex.staking-rewards-balance))
+(expect "1000" (* 1000 (^ 10 12)) (free.tellorflex.staking-rewards-balance))
 (expect "0" 0 (free.tellorflex.total-reward-debt))
 ; REWARD_RATE_TARGET = 60 * 60 * 24 * 30 = 2592000; // 30 days
-(expect "expected reward rate" (/ (* 1000 (^ 10 18)) 2592000) (free.tellorflex.reward-rate))
+(expect "expected reward rate" (/ (* 1000 (^ 10 12)) 2592000) (free.tellorflex.reward-rate))
 ; create 2 mock disputes, vote once
 (free.governance-mock.begin-dispute "reporter1-keyset" "" 0)
 (free.governance-mock.begin-dispute "reporter1-keyset" "" 0)
 ; vote on dispute-id 1; disregard the other params due to structure TODO:
 (free.governance-mock.vote 1 false false "reporter2-keyset")
 ; deposit stake
-(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 10 (^ 10 18)))
-(expect "1000" (* 1000 (^ 10 18)) (free.tellorflex.staking-rewards-balance ))
-(expect "10" (* 10 (^ 10 18)) (free.tellorflex.total-stake-amount))
+(free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 10 (^ 10 12)))
+(expect "1000" (* 1000 (^ 10 12)) (free.tellorflex.staking-rewards-balance ))
+(expect "10" (* 10 (^ 10 12)) (free.tellorflex.total-stake-amount))
 (expect "0" 0 (free.tellorflex.total-reward-debt))
 (expect "0" 0 (free.tellorflex.accumulated-reward-per-share))
-; blocky1 = 86400 should be equal to time of last allocation
-(expect "10"  (str-to-int 10 (format-time "%s" (time "1970-01-02T00:00:00Z"))) (free.tellorflex.time-of-last-allocation))
+(expect "10"  (free.h.blockTime) (free.tellorflex.time-of-last-allocation))
 (expect "should stil have money staked" {"guard": (describe-keyset "free.reporter2-keyset")
                                         ,"is-staked": false
                                         ,"locked-balance": 0
                                         ,"reporter-last-timestamp": 0
                                         ,"reports-submitted": 0
                                         ,"reward-debt": 0
-                                        ,"staked-balance": (* 10 (^ 10 18))
-                                        ,"start-date": 86400
+                                        ,"staked-balance": (* 10 (^ 10 12))
+                                        ,"start-date": (free.h.blockTime)
                                         ,"start-vote-count": 2
                                         ,"start-vote-tally": 1}(free.tellorflex.get-staker-info "reporter2-keyset"))
 ; advance time
-(format-time "%s" (at 'block-time (chain-data)))
-; current time = 86400
-(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (+ (* 84600 10) 84600)))})
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 10))})
 (expect "990.0" 990.0 (coin.get-balance "reporter2-keyset"))
 (free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") 0)
-(format-time "%s" (at 'block-time (chain-data)))
-; current time = 930600
-(expect "930600"  930600 (free.tellorflex.time-of-last-allocation))
-; expectedRewardRate = 385802469135802 30 days
-(expect "expected reward rate" (/ (* 1000 (^ 10 18)) 2592000) (free.tellorflex.reward-rate))
-; expectedAccumulatedRewardPerShare = BN(blocky1.timestamp - blocky0.timestamp).mul(expectedRewardRate).div(10)
-; (/ (* (- 930600 86400) 385802469135802) 10) = 32569444444444404840
-; expectedBalance = BN(h.toWei("10")).mul(expectedAccumulatedRewardPerShare).div(h.toWei("1")).add(h.toWei("990"))
-; (+ (/ (* (* 10 (^ 10 18)) 32569444444444404840) (^ 10 18)) (* 990 (^ 10 18))) = 1315694444444444048400
-(expect "reporter2 balance 1315694444444444048400" (free.tellorflex.to-decimal 1315694444444444048400)(coin.get-balance "reporter2-keyset"))
-(expect "32569444444444404840" 32569444444444404840 (free.tellorflex.accumulated-reward-per-share))
-(expect "total reward debt expected balance - balance" (- 1315694444444444048400 (* 990 (^ 10 18)))(free.tellorflex.total-reward-debt))
-(expect "should stil have money staked" {"guard": (describe-keyset "free.reporter2-keyset")
-                                        ,"is-staked": false
-                                        ,"locked-balance": 0
-                                        ,"reporter-last-timestamp": 0
-                                        ,"reports-submitted": 0
-                                        ,"reward-debt": (- 1315694444444444048400 (* 990 (^ 10 18)))
-                                        ,"staked-balance": (* 10 (^ 10 18))
-                                        ,"start-date": 930600
-                                        ,"start-vote-count": 2
-                                        ,"start-vote-tally": 1}(free.tellorflex.get-staker-info "reporter2-keyset"))
-; placeholder parameters! TODO:
+(expect "block1 timestamp"  (free.h.blockTime) (free.tellorflex.time-of-last-allocation))
+(let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
+       (expectedRewardRate (/ (free.h.precision 1000) REWARD_RATE_TARGET)))
+
+    (expect "rewardRate expectedRewardRate" expectedRewardRate (free.tellorflex.reward-rate))
+
+    (let* ((block0 1671658001)
+           (block1 (free.h.blockTime))
+           (expectedAccumulatedRewardPerShare (/ (* (- block1 block0) expectedRewardRate) 10))
+           (expectedRewardDebt (* expectedAccumulatedRewardPerShare 10))
+           (staker-info (free.tellorflex.get-staker-info "reporter2-keyset"))
+           (expectedBalance
+             (+ (/
+               (* (free.h.precision 10) expectedAccumulatedRewardPerShare)
+               (free.h.precision 1)) (free.h.precision 990))))
+          (expect "accumulatedRewardPerShare"
+            expectedAccumulatedRewardPerShare (free.tellorflex.accumulated-reward-per-share))
+          (expect "reporter balance" (free.tellorflex.to-decimal expectedBalance) (coin.get-balance "reporter2-keyset"))
+          (expect "totalRewardDebt" expectedRewardDebt (free.tellorflex.total-reward-debt))
+          (expect "staked balace" (free.h.precision 10) (at 'staked-balance staker-info))
+          (expect "reward debt" expectedRewardDebt (at 'reward-debt staker-info))
+          (expect "start-vote-count" 2 (at 'start-vote-count staker-info))
+          (expect "start-vote-tally" 1 (at 'start-vote-tally staker-info))
+
+      )
+)
 (free.governance-mock.begin-dispute "reporter1-keyset" "" 0)
 (commit-tx)
+
 ; advance time
-(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (+ (* 84600 10) 930600)))})
+(env-chain-data {'block-time: (free.h.advanceTime (* 86400 10))})
 (begin-tx)
 (free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") 0)
-(expect "1776600" (+ (* 84600 10) 930600)(free.tellorflex.time-of-last-allocation))
-(expect "expected reward rate" (/ (* 1000 (^ 10 18)) 2592000) (free.tellorflex.reward-rate))
-; expectedAccumulatedRewardPerShare = BN(blocky2.timestamp - blocky1.timestamp).mul(expectedRewardRate).div(10).add(expectedAccumulatedRewardPerShare)
-(expect "reporter2 balance 1315694444444444048400" (free.tellorflex.to-decimal 1315694444444444048400)(coin.get-balance "reporter2-keyset"))
-(expect "65208333333333254040" 65208333333333254040 (free.tellorflex.accumulated-reward-per-share))
-(expect "expectedRewardDebt" (* 65208333333333254040 10) (free.tellorflex.total-reward-debt))
-(expect "should stil have money staked" {"guard": (describe-keyset "free.reporter2-keyset")
-                                        ,"is-staked": false
-                                        ,"locked-balance": 0
-                                        ,"reporter-last-timestamp": 0
-                                        ,"reports-submitted": 0
-                                        ,"reward-debt": (* 65208333333333254040 10)
-                                        ,"staked-balance": (* 10 (^ 10 18))
-                                        ,"start-date": 1776600
-                                        ,"start-vote-count": 2
-                                        ,"start-vote-tally": 1}(free.tellorflex.get-staker-info "reporter2-keyset"))
+(let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
+       (expectedRewardRate (/ (free.h.precision 1000) REWARD_RATE_TARGET)))
+       (expect "current time" (free.h.blockTime)(free.tellorflex.time-of-last-allocation))
+       (expect "rewardRate expectedRewardRate" expectedRewardRate (free.tellorflex.reward-rate))
+
+    (let* ((block0 1671658001)
+           (block1 1672522001)
+           (block2 (free.h.blockTime))
+           (expectedAccumulatedRewardPerShare (/ (* (- block1 block0) expectedRewardRate) 10))
+           (expectedAccumulatedUpdated
+             (+ expectedAccumulatedRewardPerShare
+               (/ (* (- block2 block1) expectedRewardRate) 10)))
+           (expectedRewardDebt (* expectedAccumulatedUpdated 10))
+           (staker-info (free.tellorflex.get-staker-info "reporter2-keyset"))
+           (expectedBalance
+             (+ (/
+               (* (free.h.precision 10) expectedAccumulatedRewardPerShare)
+               (free.h.precision 1)) (free.h.precision 990))))
+          (expect "staker token balance should be expectedBalance"
+            expectedBalance (round (free.h.precision (coin.get-balance "reporter2-keyset"))))
+          (expect "accumulatedRewardPerShare expectedAccumulatedUpdated"
+            expectedAccumulatedUpdated (free.tellorflex.accumulated-reward-per-share))
+          (expect "totalRewardDebt expectedRewardDebt" expectedRewardDebt
+           (free.tellorflex.total-reward-debt))
+         (expect "stakedBalance 10" (free.h.precision 10) (at 'staked-balance staker-info))
+         (expect "rewardDebt expectedRewardDebt" expectedRewardDebt  (at 'reward-debt staker-info))
+         (expect "startVoteCount 2" 2 (at 'start-vote-count staker-info))
+         (expect "start-vote-tally 1" 1 (at 'start-vote-tally staker-info))
+      )
+)
 ; start a dispute and vote
 (free.governance-mock.begin-dispute "reporter1-keyset" "" 0)
 ; vote on dispute id 4, disregard placeholder params
 (free.governance-mock.vote 4 false false "reporter2-keyset")
-(format-time "%s" (at 'block-time (chain-data)))
-; current-time = 1776600
 ; advance time
-(env-chain-data {"block-time": (parse-time "%s" (int-to-str 10 (+ (* 84600 5) 1776600)))})
+(env-chain-data {"block-time": (free.h.advanceTime (* 86400 5))})
 (commit-tx)
 (begin-tx)
 (free.tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") 0)
-(expect "timeOfLastAllocation" (+ (* 84600 5) 1776600)(free.tellorflex.time-of-last-allocation))
-(expect "expectedRewardRate" (/ (* 1000 (^ 10 18)) 2592000) (free.tellorflex.reward-rate))
-; expectedAccumulatedRewardPerShare = BN(blocky3.timestamp - blocky2.timestamp).mul(expectedRewardRate).div(10).add(expectedAccumulatedRewardPerShare)
-; expectedBalance = expectedBalance.add(expectedAccumulatedRewardPerShare.mul(10).sub(expectedRewardDebt).div(2))
-(let* ((current-timestamp (str-to-int 10 (format-time "%s" (at 'block-time (chain-data)))))
-      (previous-timestamp (- (str-to-int 10(format-time "%s" (at 'block-time (chain-data)))) (* 84600 5)))
-      (expected-reward-rate 385802469135802)
-      (expectedRewardDebt (* 65208333333333254040 10))
-      (prev-expectedAccumulatedRewardPerShare 65208333333333254040)
-      (expectedAccumulatedRewardPerShare (+ (/ (* (- current-timestamp previous-timestamp) expected-reward-rate) 10) prev-expectedAccumulatedRewardPerShare))
-      (prev-expectedBalance 1315694444444444048400)
-      (expectedBalance (+ prev-expectedBalance (/ (- (* expectedAccumulatedRewardPerShare 10) expectedRewardDebt) 2))))
-      (expect "1397291666666666171400" (free.tellorflex.to-decimal expectedBalance) (coin.get-balance "reporter2-keyset"))
+(let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
+       (expectedRewardRate (/ (free.h.precision 1000) REWARD_RATE_TARGET)))
+       (expect "rewardRate expectedRewardRate" expectedRewardRate (free.tellorflex.reward-rate))
+       (expect "timeOfLastAllocation" (free.h.blockTime)(free.tellorflex.time-of-last-allocation))
+
+    (let* ((block0 1671658001)
+           (block1 1672522001)
+           (block2 1673386001)
+           (block3 (free.h.blockTime))
+           (expectedAccumulatedRewardPerShare (/ (* (- block1 block0) expectedRewardRate) 10))
+           (expectedAccumulatedUpdated
+             (+ expectedAccumulatedRewardPerShare
+               (/ (* (- block2 block1) expectedRewardRate) 10)))
+           (expectedAccumulatedUpdated2 (+ expectedAccumulatedUpdated
+             (/ (* (- block3 block2) expectedRewardRate) 10)))
+           (expectedRewardDebt (* expectedAccumulatedUpdated 10))
+           (staker-info (free.tellorflex.get-staker-info "reporter2-keyset"))
+           (expectedBalance
+             (+ (/
+               (* (free.h.precision 10) expectedAccumulatedRewardPerShare)
+               (free.h.precision 1)) (free.h.precision 990)))
+           (expectedBalance2 (+ expectedBalance
+             (/ (- (* expectedAccumulatedUpdated2 10) expectedRewardDebt) 2)))
+            (expectedRewardDebt2 (* 10 expectedAccumulatedUpdated2)))
+          (expect "staker token balance should be expectedBalance"
+            expectedBalance2 (round (free.h.precision (coin.get-balance "reporter2-keyset"))))
+          (expect "accumulatedRewardPerShare expectedAccumulatedUpdated"
+            expectedAccumulatedUpdated2 (free.tellorflex.accumulated-reward-per-share))
+          (expect "totalRewardDebt expectedRewardDebt2" expectedRewardDebt2
+           (free.tellorflex.total-reward-debt))
+         (expect "stakedBalance 10" (free.h.precision 10) (at 'staked-balance staker-info))
+         (expect "rewardDebt expectedRewardDebt2" expectedRewardDebt2  (at 'reward-debt staker-info))
+         (expect "startVoteCount 2" 2 (at 'start-vote-count staker-info))
+         (expect "start-vote-tally 1" 1 (at 'start-vote-tally staker-info))
       )
-(expect "accumulatedRewardPerShare" 81527777777777678640 (free.tellorflex.accumulated-reward-per-share))
-(expect "expectedRewardDebt" (* 81527777777777678640 10) (free.tellorflex.total-reward-debt))
-(expect "should stil have money staked" {"guard": (describe-keyset "free.reporter2-keyset")
-                                        ,"is-staked": false
-                                        ,"locked-balance": 0
-                                        ,"reporter-last-timestamp": 0
-                                        ,"reports-submitted": 0
-                                        ,"reward-debt": (* 81527777777777678640 10)
-                                        ,"staked-balance": (* 10 (^ 10 18))
-                                        ,"start-date": 2199600
-                                        ,"start-vote-count": 2
-                                        ,"start-vote-tally": 1}(free.tellorflex.get-staker-info "reporter2-keyset"))
-(+ (- (* 1000 (^ 10 18)) 1397291666666666171400) (* 990 (^ 10 18)))
-(expect "stakingRewardsBalance" 592708333333333828600 (free.tellorflex.staking-rewards-balance))
-(commit-tx)
+)

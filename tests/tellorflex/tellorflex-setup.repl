@@ -18,9 +18,9 @@
   "tellorflex" ;tellorflex account name in coin
   coin ;Token contract
   43200 ;Reporting lock
-  (* 500 (^ 10 18)) ;Staking target price
-  (* 50 (^ 10 18)) ;Staking token price
-  (* 100 (^ 10 18)) ;Minimum stake amount
+  (* 500 (^ 10 12)) ;Staking target price
+  (* 50 (^ 10 12)) ;Staking token price
+  (* 100 (^ 10 12)) ;Minimum stake amount
   (hash (base64-encode "{SpotPrice: [trb,usd]}")) ;Staking token query id
   )
 
