@@ -1,0 +1,37 @@
+# disclaimer do your research
+# Create and define your namespace
+networkId: "testnet04"
+type: exec
+
+code: (define-namespace (ns.create-principal-namespace (read-keyset "admin-keyset")) (read-keyset "user-keyset") (read-keyset "admin-keyset"))
+# the names aren't important but in this setup they are defined this way
+# admin-keyset creates the keyset
+# user-keyset the keyset allowed to deploy modules under the namespace (could be same as admin)
+data:
+  admin-keyset:
+    keys:
+      - "d008b4c2de7a79eef0c76125787d7fbe2659f1fdb66cf0f1165fb7f21a480583"
+      # add more keys if necessary
+      # - ""
+      # - ""
+    # update predicate as needed 
+    pred: "keys-all"
+
+  user-keyset:
+    keys:
+      - "63fe97b2ef8597ee57c3addadd09185446a2b45f81395620898a52c4747c37d4"
+    # update predicate as needed 
+    pred: "keys-all" 
+
+signers:
+  - public: "c6e28a95e4f76e99d9eeb35d177aa2284686cee4c4654388a114a32ac50a0874"
+  # add pub keys if multi account
+  # - public: ""
+  # - public: ""
+publicMeta:
+  chainId: "1"
+  sender: "gas-account"
+
+  gasLimit: 2000
+  gasPrice: 1.0e-7
+  ttl: 600
