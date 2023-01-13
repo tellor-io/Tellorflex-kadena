@@ -90,7 +90,7 @@
     @managed amount TRANSFER-mgr
     (enforce (!= sender receiver) "same sender and receiver")
     (enforce-unit amount)
-    (enforce (>= amount 0.0) "Positive amount")
+    (enforce (> amount 0.0) "Positive amount")
     (compose-capability (DEBIT sender))
     (compose-capability (CREDIT receiver))
   )
@@ -153,7 +153,7 @@
   (defconst COIN_CHARSET CHARSET_LATIN1
     "The default coin contract character set")
 
-  (defconst MINIMUM_PRECISION 18
+  (defconst MINIMUM_PRECISION 12
     "Minimum allowed precision for coin transactions")
 
   (defconst MINIMUM_ACCOUNT_LENGTH 3
@@ -346,8 +346,8 @@
     (validate-account sender)
     (validate-account receiver)
 
-    (enforce (>= amount 0.0)
-     "transfer amount must be positive")
+    (enforce (> amount 0.0)
+      "transfer amount must be positive")
 
     (enforce-unit amount)
 
@@ -456,7 +456,7 @@
 
     (validate-account account)
 
-    (enforce (>= amount 0.0)
+    (enforce (> amount 0.0)
       "debit amount must be positive")
 
     (enforce-unit amount)
@@ -482,7 +482,7 @@
 
     (validate-account account)
 
-    (enforce (>= amount 0.0) "credit amount must be positive")
+    (enforce (> amount 0.0) "credit amount must be positive")
     (enforce-unit amount)
 
     (require-capability (CREDIT account))

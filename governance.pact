@@ -133,6 +133,7 @@
     (let* ((tellorflex:module{free.i-flex} (tellorflex))
            (token:module{fungible-v2} (token))
            (block-number (tellorflex::get-block-number-by-timestamp query-id timestamp))
+           (stake-amount (tellorflex::stake-amount))
            (hash (hash [query-id timestamp]))
            (dispute-id (+ (vote-count) 1))
            (dispute-fee (get-dispute-fee))
@@ -153,7 +154,8 @@
                 { 'open-disputes-on-id: 0 } { 'open-disputes-on-id := open-disputes }
                 (enforce (< (- block-time timestamp) TWELVE_HOURS)
                   "Dispute must be started within reporting lock time")
-                (let ((fee (* dispute-fee (^ 2 open-disputes))) )
+                (let* ((calc-fee (* dispute-fee (^ 2 open-disputes)))
+                       (fee (if (> calc-fee stake-amount) stake-amount calc-fee)))
                     ;  transfer fee to gov account
                     (token::transfer account (gov-account) (float fee))
                     ;  insert dispute info into dispute-info table
@@ -175,9 +177,10 @@
                   )
                 )
                 ;  if a dispute already exists for this report then create a new dispute round
-                (let ((prev-tally-date
+                (let* ((prev-tally-date
                         (at 'tally-date (read vote-info (str (at (- vote-round 2) dispute-ids)))))
-                      (fee (* dispute-fee (^ 2 (length dispute-ids)))) )
+                      (calc-fee(* dispute-fee (^ 2 (length dispute-ids))))
+                      (fee (if (> calc-fee stake-amount) stake-amount calc-fee)))
                     (enforce (< (- block-time prev-tally-date) ONE_DAY)
                       "New dispute round must be started within a day")
                     ;  transfer fee to gov account
@@ -352,9 +355,9 @@
              (reports-submitted (try 0
                (tellorflex::get-reports-submitted-by-address voter-account)))
              (voter-balance
-               (if (= {} voter-stake-info) (round (* (token::get-balance voter-account) (^ 10 18)))
+               (if (= {} voter-stake-info) (round (* (token::get-balance voter-account) (^ 10 12)))
                    (fold (+) 0 [
-                   (round (* (token::get-balance voter-account) (^ 10 18)))
+                   (round (* (token::get-balance voter-account) (^ 10 12)))
                    (at 'staked-balance voter-stake-info)
                    (at 'locked-balance voter-stake-info)]))))
             (with-capability (PRIVATE)
@@ -492,7 +495,7 @@
 ; *                                                                           *
 ; *****************************************************************************
   (defun calculate-vote-to-scale (votes vote-sum)
-    ( / (* votes (^ 10 18)) vote-sum)
+    ( / (* votes (^ 10 12)) vote-sum)
   )
 ; *****************************************************************************
 ; *                                                                           *
@@ -618,7 +621,7 @@
 ; *****************************************************************************
   (defun str (num:integer) (int-to-str 10 num) )
 
-  (defun float:decimal (num:integer) (/ (/ num 1.0) (^ 10 18)) )
+  (defun float:decimal (num:integer) (/ (/ num 1.0) (^ 10 12)) )
 
   (defun block-time ()
     (str-to-int 10

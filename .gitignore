@@ -1,3 +1,4 @@
 .pact-history
 .DS_Store
 testnet*
+*venv
