@@ -14,7 +14,8 @@
   {"key": "reporter2-public-key", "caps": []},
   {"key": "user-public-key", "caps": []}])
 
-(begin-tx "2 reporters stake and unstake with staking rewards")
+(print "2 reporters stake and unstake with staking rewards")
+(begin-tx)
 ; deposit 1st stake
 (free.tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset")
   (free.h.precision 100))
@@ -25,7 +26,7 @@
 )
 (expect "totalRewardDebt 0" 0 (free.tellorflex.total-reward-debt))
 ; add staking rewards
-(free.tellorflex.add-staking-rewards "user-keyset" 1000.0)
+(free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1000))
 (let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
        (expectedRewardRate (/ (free.h.precision 1000) REWARD_RATE_TARGET)))
        (expect "rewardRate 10" expectedRewardRate (free.tellorflex.reward-rate))

@@ -28,9 +28,9 @@
 ; *                          Constants                                        *
 ; *                                                                           *
 ; *****************************************************************************
-  (defconst TIME_BASED_REWARD (* 5 (^ 10 17)))
+  (defconst TIME_BASED_REWARD (* 5 (^ 10 11)))
 
-  (defconst PRECISION (^ 10 18))
+  (defconst PRECISION (^ 10 12))
 
   (defconst SEVEN_DAYS 604800)
 
@@ -280,18 +280,16 @@
       (insert governance-table 'governance { 'governance: governance }))
   )
 
-  (defun add-staking-rewards (account:string amount:decimal)
+  (defun add-staking-rewards (account:string amount:integer)
     @doc "Funds the flex contract with staking rewards (autopay and miniting) anyone can add at will"
     (with-capability (PRIVATE)
-    (let ((token:module{fungible-v2} (token)))
-      (token::transfer account (tellorflex-account) amount)
-
+      (transfers-to-flex amount account)
       (with-capability (PRIVATE) (update-rewards) )
         (update global-variables 'global-vars
-          { 'staking-rewards-balance: (precision amount)})
+          { 'staking-rewards-balance: amount})
           (update global-variables 'global-vars
             { 'reward-rate: (/ (calculate-reward-rate) THIRTY_DAYS)})
-    ))
+    )
   )
 
   (defun add-staker (staker:string guard:guard)
@@ -335,10 +333,8 @@
 
   (defun deposit-stake (staker:string guard:guard amount:integer)
     @doc "Allows a reporter to submit stake"
-    ; (enforce (> amount 0) "Amount must be greater than 0")
     (let ((governance:module{i-governance} (get-governance-module))
-          (block-time (block-time-in-seconds))
-          (token:module{fungible-v2} (token)))
+          (block-time (block-time-in-seconds)))
 
       (with-capability (PRIVATE) (add-staker staker guard) )
 
@@ -358,23 +354,24 @@
                     (updated-amount (- amount locked-balance)))
                   ;  if the amount is greater than the locked balance, transfer the difference
                   ;  and update the locked balance to 0
-                  (token::transfer staker (tellorflex-account) (to-decimal updated-amount))
+                  (transfers-to-flex updated-amount staker)
                   (update staker-details staker
                   { 'locked-balance: 0})
                   (update global-variables 'global-vars
                   { 'to-withdraw: updated-withdraw-amount})
               )
             )
-            (let ((decimal-amount (to-decimal amount)))
+            (let ((vote-count (governance::get-vote-count))
+                  (vote-tally (governance::get-vote-tally-by-address staker)))
                 ;  if the staked balance is 0, update the start vote count and tally
                 (if (= staked-balance 0)
                     (update staker-details staker
-                      { 'start-vote-count: (governance::get-vote-count)
-                      , 'start-vote-tally: (governance::get-vote-tally-by-address staker)
+                      { 'start-vote-count: vote-count
+                      , 'start-vote-tally: vote-tally
                       })
                     "Staked balance is not 0 vote tally and count not updated"
                 )
-              (token::transfer staker (tellorflex-account) decimal-amount)
+              (transfers-to-flex amount staker)
             )
           )
           (update-stake-and-pay-rewards staker
@@ -438,42 +435,31 @@
       (with-read staker-details reporter
         { 'staked-balance := staked-balance ,'locked-balance := locked-balance }
         (enforce (> (+ staked-balance locked-balance) 0) "Zero staker balance")
-        (let* ((token:module{fungible-v2} (token))
-               (stake-amount (stake-amount))
+        (let* ((stake-amount (stake-amount))
                (to-withdraw (to-withdraw)))
 
         (if (>= locked-balance stake-amount)
             (let ((locked-bal (- locked-balance stake-amount))
-                  (withdraw-bal (- to-withdraw stake-amount))
-                  (slash-amount (to-decimal stake-amount)))
-                (install-capability
-                  (token::TRANSFER (tellorflex-account) recipient slash-amount))
-                (token::transfer (tellorflex-account) recipient slash-amount)
+                  (withdraw-bal (- to-withdraw stake-amount)))
+                (transfers-from-flex stake-amount recipient)
 
                 (update staker-details reporter {'locked-balance: locked-bal})
                 (update global-variables 'global-vars {'to-withdraw: withdraw-bal})
                 stake-amount
             )
             (if (>= (+ locked-balance staked-balance) stake-amount)
-                (let ((withdraw-bal (- to-withdraw locked-balance))
-                      (slash-amount (to-decimal stake-amount)))
+                (let ((withdraw-bal (- to-withdraw locked-balance)))
                   (update-stake-and-pay-rewards reporter (- staked-balance (- stake-amount locked-balance)))
-                  (install-capability
-                    (token::TRANSFER (tellorflex-account) recipient slash-amount))
-                  (token::transfer (tellorflex-account) recipient slash-amount)
-
+                  (transfers-from-flex stake-amount recipient)
                   (update staker-details reporter {'locked-balance: 0})
                   (update global-variables 'global-vars {'to-withdraw: withdraw-bal})
                   stake-amount
                 )
-                (let* ((amount (+ staked-balance locked-balance))
-                       (slash-amount (to-decimal amount))
+                (let ((amount (+ staked-balance locked-balance))
                        (withdraw-bal (- to-withdraw locked-balance)))
 
                     (update-stake-and-pay-rewards reporter 0)
-                    (install-capability
-                      (token::TRANSFER (tellorflex-account) reporter slash-amount))
-                    (token::transfer (tellorflex-account) reporter slash-amount)
+                    (transfers-from-flex amount reporter)
 
                     (update global-variables 'global-vars { 'to-withdraw: withdraw-bal })
                     (update staker-details reporter { 'locked-balance: 0 })
@@ -535,18 +521,9 @@
                { 'timestamps:
                (+ timestamps-lis [{'timestamp: block-time, 'disputed: false}])}
              )
-            (let ((time-reward (calculate-time-based-reward block-time))
-                  (token:module{fungible-v2} (token)))
-              (if (> time-reward 0.0)
-                (let ((transfer-cap
-                  (install-capability
-                    (token::TRANSFER (tellorflex-account) staker time-reward))))
-                  transfer-cap
-                  (token::transfer (tellorflex-account) staker time-reward)
-                )
-                  "pass"
-              )
-            )
+
+            (transfers-from-flex (calculate-time-based-reward block-time) staker)
+
             (update global-variables 'global-vars
                { 'time-of-last-new-value: block-time})
 
@@ -599,24 +576,18 @@
 
   (defun withdraw-stake (staker:string)
     @doc "Withdraws a reporter's stake after the lock period expires"
-    (let ((token:module{fungible-v2} (token))
-          (block-time (block-time-in-seconds))
-          (to-withdraw (to-withdraw)))
+    (with-capability (STAKER staker)
+      (with-read staker-details staker
+        { "start-date" := start-date
+        , "locked-balance" := locked-balance }
+        (enforce (> (- (block-time-in-seconds) start-date) SEVEN_DAYS) "7 days didn't pass")
+        (enforce (> locked-balance 0) "reporter not locked for withdrawal")
+        (transfers-from-flex locked-balance staker)
 
-        (with-capability (STAKER staker)
-          (with-read staker-details staker
-            { "start-date" := start-date
-            , "locked-balance" := locked-balance }
-            (enforce (> (- block-time start-date) SEVEN_DAYS) "7 days didn't pass")
-            (enforce (> locked-balance 0) "reporter not locked for withdrawal")
-            (install-capability (token::TRANSFER (tellorflex-account) staker (to-decimal locked-balance)))
-            (token::transfer (tellorflex-account) staker (to-decimal locked-balance))
+        (update staker-details staker { "locked-balance": 0 } )
 
-            (update staker-details staker { "locked-balance": 0 } )
-
-            (update global-variables 'global-vars
-            { 'to-withdraw: (- to-withdraw locked-balance )})
-        )
+        (update global-variables 'global-vars
+        { 'to-withdraw: (- (to-withdraw) locked-balance )})
       )
     )
   )
@@ -752,11 +723,33 @@
   (defun retrieve-data:string (query-id:string timestamp:integer)
       (at 'value (read reports (concatenate query-id timestamp)))
   )
-   ; *****************************************************************************
-   ; *                                                                           *
-   ; *                          Private functions                                *
-   ; *                                                                           *
-   ; *****************************************************************************
+; *****************************************************************************
+; *                                                                           *
+; *                          Private functions                                *
+; *                                                                           *
+; *****************************************************************************
+  (defun transfers-from-flex (amount:integer to:string)
+    (require-capability (PRIVATE))
+    (if (> amount 0)
+        (let ((token:module{fungible-v2} (token))
+              (flex (tellorflex-account)))
+          (enforce (> amount 0) "Amount must be greater than zero")
+          (install-capability (token::TRANSFER flex to (to-decimal amount)))
+          (token::transfer flex to (to-decimal amount))
+        )
+        "nothing to transfer"
+    )
+  )
+  (defun transfers-to-flex (amount:integer from:string)
+    (require-capability (PRIVATE))
+    (if (> amount 0)
+        (let ((token:module{fungible-v2} (token)))
+          (enforce (> amount 0) "Amount must be greater than zero")
+          (token::transfer from (tellorflex-account) (to-decimal amount))
+        )
+        "nothing to transfer"
+    )
+  )
    (defun update-rewards ()
      (require-capability (PRIVATE))
      (with-read global-variables 'global-vars
@@ -799,8 +792,7 @@
       , 'is-staked := staked
       }
       ( with-read global-variables 'global-vars
-        { 'token := token:module{fungible-v2}
-        , 'staking-rewards-balance := staking-rewards
+        { 'staking-rewards-balance := staking-rewards
         , 'accumulated-reward-per-share := accumulated-reward-per-share
         , 'total-stake-amount := total-stake-amount
         , 'total-reward-debt := total-reward-debt }
@@ -824,23 +816,14 @@
                                 temp-pending-reward
                                 pending-reward
                             )))
-                    (install-capability
-                      (token::TRANSFER (tellorflex-account) staker
-                        (to-decimal pay-amount)))
-                    (token::transfer
-                      (tellorflex-account) staker (to-decimal pay-amount))
+                    (transfers-from-flex pay-amount staker)
                     (update global-variables 'global-vars
                       { 'staking-rewards-balance: (- staking-rewards pay-amount)
                       })
                   )
                   (let ((updated-staking-rewards (- staking-rewards pending-reward)))
 
-                      (install-capability
-                        (token::TRANSFER (tellorflex-account) staker
-                          (to-decimal pending-reward)))
-                      (token::transfer
-                        (tellorflex-account) staker (to-decimal pending-reward))
-
+                      (transfers-from-flex pending-reward staker)
                       (update global-variables 'global-vars
                         { 'staking-rewards-balance: updated-staking-rewards })
                   )
@@ -952,10 +935,10 @@
 
           (if (and (> total-time-based-rewards-balance 0) (> reward 0) )
               (if (< total-time-based-rewards-balance reward)
-                  (to-decimal total-time-based-rewards-balance)
-                  (to-decimal reward)
+                  total-time-based-rewards-balance
+                  reward
               )
-              0.0
+              0
           )
       )
     )

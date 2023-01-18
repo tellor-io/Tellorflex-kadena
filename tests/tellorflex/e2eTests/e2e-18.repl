@@ -8,7 +8,8 @@
   {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "tellorflex" 1000.0)]},
   {"key": "user-public-key", "caps": []}])
 
-(begin-tx "Time based rewards don't steal from stakes pending withdrawal")
+(print "Time based rewards don't steal from stakes pending withdrawal")
+(begin-tx)
 (free.tellorflex.deposit-stake "user-keyset" (describe-keyset "free.user-keyset")
   (free.h.precision 1000))
 (expect "total time based rewards balance should be 0" 0
@@ -31,3 +32,4 @@
   (free.tellorflex.get-total-time-based-rewards-balance))
 (expect "toWithdraw should be 0" 0
   (free.tellorflex.to-withdraw))
+  (free.h.precision 100)
