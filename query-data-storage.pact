@@ -1,4 +1,4 @@
-(namespace (read-msn "ns"))
+(namespace (read-msg "ns"))
 
 (module QueryDataStorage TELLOR
     @doc
