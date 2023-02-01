@@ -4,6 +4,6 @@
 (env-chain-data {'block-time: (time "2022-12-21T21:26:41Z"), 'block-height: 1})
 
 (begin-tx)
-(load "../../queryDataStorage.pact")
+(load "../../query-data-storage.pact")
 (load "../../autopay.pact")
 (commit-tx)

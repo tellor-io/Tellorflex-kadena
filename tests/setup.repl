@@ -90,7 +90,7 @@
 (commit-tx)
 
 (env-gasmodel "table")
-(env-gaslimit 160500)
+(env-gaslimit 170000)
 
 ;  (print "----------")
 ;  (print "'reporter1' account created:\n  - keyset: 'reporter1-keyset'\n  - public key: 'reporter1-public-key'\n  - balance: 1000.0 KDA")

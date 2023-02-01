@@ -16,7 +16,6 @@
 
 (free.tellorflex.constructor
   "tellorflex" ;tellorflex account name in coin
-  coin ;Token contract
   43200 ;Reporting lock
   (* 500 (^ 10 12)) ;Staking target price
   (* 50 (^ 10 12)) ;Staking token price

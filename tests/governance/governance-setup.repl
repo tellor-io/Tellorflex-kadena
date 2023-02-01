@@ -7,8 +7,8 @@
 (load "../../tellorflex.pact")
 (load "../../governance.pact")
 
- (free.tellorflex.constructor "tellorflex" coin 43200 1 1 (* 10 (^ 10 12)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
- (free.governance.constructor free.tellorflex coin "" "governance" "autopay-query-id-list")
+ (free.tellorflex.constructor "tellorflex" 43200 1 1 (* 10 (^ 10 12)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
+ (free.governance.constructor free.tellorflex "" "governance" "autopay-query-id-list")
  ; Input governance address in tellorflex
  (free.tellorflex.init free.governance)
  (free.governance.register-gov-guard)

@@ -5,7 +5,7 @@
 
     [
       (enforce-keyset (read-keyset "tellor-admin-keyset"))
-      (define-keyset "free.tellor-admin-keyset" (read-keyset "tellor-admin-keyset"))
+      (define-keyset (+ (read-msg "ns") ".tellor-admin-keyset") (read-keyset "tellor-admin-keyset"))
     ]
   )
 
@@ -43,7 +43,6 @@
 ; *****************************************************************************
   (defschema constructor-schema
     tellorflex-account:string
-    token:module{fungible-v2}
     accumulated-reward-per-share:integer
     minimum-stake-amount:integer
     reporting-lock:integer
@@ -122,7 +121,7 @@
 ; *****************************************************************************
   (defcap TELLOR ()
     @doc "Enforce only owner."
-    (enforce-guard (keyset-ref-guard "free.tellor-admin-keyset"))
+    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".tellor-admin-keyset")))
   )
 
   (defcap PRIVATE () true )
@@ -151,10 +150,6 @@
 ; *****************************************************************************
   (defun tellorflex-account:string ()
     (at 'tellorflex-account (read global-variables 'global-vars))
-  )
-
-  (defun token:module{fungible-v2} ()
-    (at 'token (read global-variables 'global-vars))
   )
 
   (defun get-governance-module:module{i-governance} ()
@@ -227,7 +222,6 @@
 ; *****************************************************************************
   (defun constructor:string (
     tellorflex-account:string
-    token:module{fungible-v2}
     reporting-lock:integer
     stake-amount-dollar-target:integer
     staking-token-price:integer
@@ -240,7 +234,6 @@
       (let ((potential-amount (/ stake-amount-dollar-target staking-token-price)))
         (insert global-variables 'global-vars
           { 'tellorflex-account: tellorflex-account
-          , 'token: token
           , 'accumulated-reward-per-share: 0
           , 'minimum-stake-amount: minimum-stake-amount
           , 'reporting-lock: reporting-lock
@@ -261,7 +254,7 @@
         )
       )
 
-      (token::create-account tellorflex-account (create-flex-guard))
+      (coin.create-account tellorflex-account (create-flex-guard))
       "Global variables set!"
     )
   )
@@ -709,11 +702,10 @@
       , 'staking-rewards-balance := staking-rewards-balance
       , 'to-withdraw := to-withdraw
       }
-      (let ((token:module{fungible-v2} (token)))
       (-
-        (precision (token::get-balance (tellorflex-account)))
+        (precision (coin.get-balance (tellorflex-account)))
         (fold (+) to-withdraw [total-stake-amount staking-rewards-balance]))
-      ))
+      )
   )
 
   (defun is-in-dispute:bool (query-id:string timestamp:integer)
@@ -731,11 +723,10 @@
   (defun transfers-from-flex (amount:integer to:string)
     (require-capability (PRIVATE))
     (if (> amount 0)
-        (let ((token:module{fungible-v2} (token))
-              (flex (tellorflex-account)))
+        (let ((flex (tellorflex-account)))
           (enforce (> amount 0) "Amount must be greater than zero")
-          (install-capability (token::TRANSFER flex to (to-decimal amount)))
-          (token::transfer flex to (to-decimal amount))
+          (install-capability (coin.TRANSFER flex to (to-decimal amount)))
+          (coin.transfer flex to (to-decimal amount))
         )
         "nothing to transfer"
     )
@@ -743,10 +734,10 @@
   (defun transfers-to-flex (amount:integer from:string)
     (require-capability (PRIVATE))
     (if (> amount 0)
-        (let ((token:module{fungible-v2} (token)))
+        [
           (enforce (> amount 0) "Amount must be greater than zero")
-          (token::transfer from (tellorflex-account) (to-decimal amount))
-        )
+          (coin.transfer from (tellorflex-account) (to-decimal amount))
+        ]
         "nothing to transfer"
     )
   )
@@ -918,8 +909,7 @@
 
   (defun calculate-time-based-reward:decimal (block-time:integer)
     (with-read global-variables 'global-vars
-      { 'token := token:module{fungible-v2}
-      , 'total-stake-amount := total-stake-amount
+      { 'total-stake-amount := total-stake-amount
       , 'staking-rewards-balance := staking-rewards-balance
       , 'to-withdraw := to-withdraw
       , 'time-of-last-new-value := time-of-last-new-value
@@ -927,7 +917,7 @@
 
       (let* ((reward (/ (*
               (- block-time time-of-last-new-value) time-based-reward) 300))
-             (contract-balance (token::get-balance (tellorflex-account)))
+             (contract-balance (coin.get-balance (tellorflex-account)))
              (total-time-based-rewards-balance
               (- (precision contract-balance)
                 (fold (+) total-stake-amount
