@@ -1,0 +1,9 @@
+(load "../governance/governance-setup.repl")
+(env-data { "tellor-admin-keyset": { "keys": [ "tellor-keyset-public-key" ], "pred": "keys-all" }, "upgrade": false, "ns": "free" })
+(env-sigs [{"key": "tellor-keyset-public-key", "caps": []}])
+(env-chain-data {'block-time: (time "2022-12-21T21:26:41Z"), 'block-height: 1})
+
+(begin-tx)
+(load "../../queryDataStorage.pact")
+(load "../../autopay.pact")
+(commit-tx)

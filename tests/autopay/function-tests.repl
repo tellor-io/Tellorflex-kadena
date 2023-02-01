@@ -1,0 +1,30 @@
+(load "./autopay-setup.repl")
+(env-data {
+    "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" }, "ns": "free"})
+  (env-sigs [
+    {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "autopay" 100.0), (coin.TRANSFER "reporter1-keyset" "tellorflex" 100.0)]},
+    {"key": "reporter1-public-key", "caps": []}])
+(begin-tx)
+(namespace (read-msg "ns"))
+(autopay.constructor 10)
+(expect "Fee should be 10" 10 (autopay.fee))
+(commit-tx)
+(print "function: tip")
+(namespace (read-msg "ns"))
+(expect-failure "id must be hash of bytes data" (autopay.tip "reporter1-keyset" "" 10 ""))
+(autopay.tip "reporter1-keyset" (hash (base64-encode "{SpotPrice: [eth,usd]}")) 10 (base64-encode "{SpotPrice: [eth,usd]}") )
+(expect "Tip amount should be 10 as tipped" 10 (autopay.get-current-tip (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+(free.tellorflex.deposit-stake
+    "reporter1-keyset"
+    (describe-keyset "free.reporter1-keyset")
+    (free.h.precision 10))
+(free.tellorflex.submit-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (base64-encode (free.h.priceConversion 100.0)) 0
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+(expect "tip amount should be zero after oracle submission" 0 (autopay.get-current-tip (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+(env-chain-data {'block-time: (h.advanceTime 1)})
+(autopay.tip "reporter1-keyset" (hash (base64-encode "{SpotPrice: [eth,usd]}")) 20 (base64-encode "{SpotPrice: [eth,usd]}") )
+(expect "Tip amount should be 20 as tipped" 20 (autopay.get-current-tip (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+(expect "Tips by user should be 30" 30 (autopay.get-tips-by-user "reporter1-keyset"))
+(expect "query data should be unhashed query id" (base64-encode "{SpotPrice: [eth,usd]}") (queryDataStorage.get-query-data (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
