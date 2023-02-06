@@ -176,6 +176,12 @@ contract Autopay is UsingTellor {
         }
     }
     /**
+     * @dev Getter function for queryIds with current one time tips
+     */
+    function getFundedQueryIds() external view returns (bytes32[] memory) {
+        return queryIdsWithFunding;
+    }
+    /**
      * @dev Getter function to get number of past tips
      * @param _queryId id of reported data
      * @return count of tips available
