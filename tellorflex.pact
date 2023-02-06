@@ -5,7 +5,7 @@
 
     [
       (enforce-keyset (read-keyset "tellor-admin-keyset"))
-      (define-keyset "free.tellor-admin-keyset" (read-keyset "tellor-admin-keyset"))
+      (define-keyset (+ (read-msg "ns") ".tellor-admin-keyset") (read-keyset "tellor-admin-keyset"))
     ]
   )
 
