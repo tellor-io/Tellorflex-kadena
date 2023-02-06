@@ -18,11 +18,11 @@
     @event true
   )
 ; ***************************CONSTANTS*****************************************
-  (defun cap:bool ()
+  (defun private-user-cap:bool ()
     (require-capability (PRIVATE))
   )
   (defconst AUTOPAY_GUARD:guard
-    (create-user-guard (cap))
+    (create-user-guard (private-user-cap))
   )
   (defconst PRECISION:integer 
     (^ 10 12)
@@ -81,19 +81,15 @@
               (install-capability (coin.TRANSFER "autopay" "tellorflex" (to-decimal fee-total)))
               (tellorflex.add-staking-rewards "autopay" fee-total)
               (if (= (get-current-tip query-id) 0)
-                  (if (= (at "index" (read query-ids-with-funding-index query-id)) 0)
-                      (let* ((idx (- (at "index" (read query-ids-with-funding-index query-id)) 1))
+                  (if (!= (at "index" (read query-ids-with-funding-index query-id)) 0)
+                      (let* ((idx (at "index" (read query-ids-with-funding-index query-id)))
                              (query-ids (at "query-ids-with-funding" (read global "global")))
-                             (last-item (take -1 query-ids)))
-                        (update global "global"
-                            { "query-ids-with-funding":
-                            (+
-                                (+ (take idx query-ids) last-item)
-                                (take (* -1 idx) query-ids))})
-                        (write query-ids-with-funding-index last-item
-                            { "index": (+ 1 idx) })
-                        (write query-ids-with-funding-index query-id
-                            { "index": 0 })
+                             (last-item (take -1 query-ids))
+                             (replace-qid (fold (+) (take (- idx 1) query-ids) [last-item (drop idx query-ids)]))
+                             (drop-last (drop -1 replace-qid)))
+                        (update global "global" { "query-ids-with-funding": drop-last })
+                        (update query-ids-with-funding-index (at 0 last-item) { "index": idx })
+                        (update query-ids-with-funding-index query-id { "index": 0 })
                       )
                       "none"
                   )
@@ -219,7 +215,7 @@
            (count (length tips-lis))
            (search-object
               (fold (search) { "max": count, "min": 0, "timestamp": timestamp, "tips": tips-lis }
-                    (enumerate 0 (log 2 count)) ))
+                    (enumerate 0 (+ 1 (log 2 count))) ))
            (timestamp-before
               (at "timestamp" (tellorflex.get-data-before query-id timestamp))))
       (bind search-object { "min" := min }
@@ -235,7 +231,7 @@
         (let* ((tip-amount (at "amount" (at min tips-lis)))
                (updated-tips (fold (+) (take min tips-lis) 
                 [[{ "amount": 0, "cumulative-tips": (at "cumulative-tips" (at min tips-lis))
-                  , "timestamp": (at "timestamp" (at min tips-lis))}] (take (* -1 min) tips-lis)])) 
+                  , "timestamp": (at "timestamp" (at min tips-lis))}] (drop (+ min 1) tips-lis)])) 
                (time-after-submission
                 (at "timestamp" (tellorflex.get-data-before query-id (+ timestamp 1))))
                (time-b4-submission (tellorflex.get-data-before query-id (+ timestamp-before 1) ))
@@ -247,7 +243,7 @@
           (update tips query-id { "tips": updated-tips })
           (if (or (> (- index-now index-before) 1) (= "" before-val))
               (if (= "" before-val)
-                  (at "cumlative-tips" (at min updated-tips))
+                  (at "cumulative-tips" (at min updated-tips))
                   (let ((search-object2 (fold (search)
                                           { "max": min
                                           , "min": 0
@@ -312,6 +308,10 @@
   (defun get-past-tip-by-index (query-id:string index:integer)
     @doc "Getter function for past tips by index"
     (at index (at "tips" (read tips query-id)))
+  )
+  (defun get-query-ids-with-funding-index:integer (query-id:string)
+    @doc "Get index of a funded query id"
+    (at "index" (read query-ids-with-funding-index query-id))
   )
   (defun get-tips-by-user (user:string)
       (at "total" (read user-tips-total user))
