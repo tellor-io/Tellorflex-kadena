@@ -857,6 +857,7 @@
     (str-to-int 10 (format-time "%s" (at 'block-time (chain-data))))
   )
   (defun calculate-time-based-reward:decimal (block-time:integer)
+    (require-capability (PRIVATE))
     (with-read global-variables 'global-vars
       { 'total-stake-amount := total-stake-amount
       , 'staking-rewards-balance := staking-rewards-balance
@@ -909,6 +910,7 @@
     (/ (/ amount 1.0) PRECISION)
   )
   (defun new-accumulated-reward-per-share:integer ()
+    (require-capability (PRIVATE))
     (with-read global-variables 'global-vars
       { 'time-of-last-allocation := time-of-last-allocation
       , 'reward-rate := reward-rate
