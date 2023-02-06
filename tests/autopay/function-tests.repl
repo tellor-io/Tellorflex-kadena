@@ -171,7 +171,22 @@
     (h.precision 100) (base64-encode "{SpotPrice: [eth,usd]}"))
 (expect "Past tip count should still be 2" 2
     (autopay.get-past-tip-count (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+(rollback-tx)
 
+(print "*****************************************")
+(print "Function test: get-tips-by-user")
+(begin-tx)
+(namespace (read-msg "ns"))
+(autopay.tip "user-keyset" 
+    (hash (base64-encode "{SpotPrice: [btc,usd]}")) 
+    (h.precision 10) (base64-encode "{SpotPrice: [btc,usd]}"))
+(expect "Tips by user should be 10" (h.precision 10) (autopay.get-tips-by-user "user-keyset"))
+(env-chain-data {"block-time": (h.advanceTime 1)})
+(autopay.tip "user-keyset" 
+    (hash (base64-encode "{SpotPrice: [btc,usd]}")) 
+    (h.precision 99) (base64-encode "{SpotPrice: [btc,usd]}"))
+(expect "Tips by user should be 109" (h.precision 109) (autopay.get-tips-by-user "user-keyset"))
+(rollback-tx)
 (print "*****************************************")
 (print "Function test: claim-one-time-tip")
 (begin-tx)
