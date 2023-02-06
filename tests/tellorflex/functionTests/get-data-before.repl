@@ -1,0 +1,86 @@
+(load "../tellorflex-setup.repl")
+(env-data {
+    "ns": "free",
+    "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" },
+    "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" },
+    "reporter3-keyset": { "keys": [ "reporter3-public-key" ], "pred": "keys-all" },
+    "reporter4-keyset": { "keys": [ "reporter4-public-key" ], "pred": "keys-all" },
+    "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" } })
+(env-sigs [
+    {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "autopay" 100.0), (coin.TRANSFER "reporter1-keyset" "tellorflex" 100.0)]},
+    {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "autopay" 100.0), (coin.TRANSFER "reporter2-keyset" "tellorflex" 100.0)]},
+    {"key": "reporter3-keyset", "caps": [(coin.TRANSFER "reporter3-keyset" "autopay" 100.0), (coin.TRANSFER "reporter3-keyset" "tellorflex" 100.0)]},
+    {"key": "reporter4-keyset", "caps": [(coin.TRANSFER "reporter4-keyset" "autopay" 100.0), (coin.TRANSFER "reporter4-keyset" "tellorflex" 100.0)]},
+    {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "autopay" 100.0)]},
+    {"key": "reporter1-public-key", "caps": []}, {"key": "reporter2-public-key", "caps": []}, {"key": "reporter3-public-key", "caps": []},
+    {"key": "reporter4-public-key", "caps": []}, {"key": "user-public-key", "caps": []}])
+
+(begin-tx)
+(print "***********************************************")
+(print "Function test: get-data-before")
+(namespace (read-msg "ns"))
+(tellorflex.deposit-stake
+    "reporter1-keyset"
+    (describe-keyset "free.reporter1-keyset")
+    (h.precision 100))
+(tellorflex.deposit-stake
+    "reporter2-keyset"
+    (describe-keyset "free.reporter2-keyset")
+    (h.precision 100))
+(tellorflex.deposit-stake
+    "reporter3-keyset"
+    (describe-keyset "free.reporter3-keyset")
+    (h.precision 100))
+(tellorflex.deposit-stake
+    "reporter4-keyset"
+    (describe-keyset "free.reporter4-keyset")
+    (h.precision 100))
+;  submit value
+(tellorflex.submit-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (base64-encode (h.priceConversion 100.0)) 0
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter4-keyset")
+(expect "right data 1671658001" 1671658001
+    (at "timestamp" 
+    (tellorflex.get-data-before 
+        (hash (base64-encode "{SpotPrice: [eth,usd]}")) (+ 1 (h.blockTime)))))
+;  advance time
+(env-chain-data {'block-time: (h.advanceTime 1)})
+(tellorflex.submit-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (base64-encode (h.priceConversion 100.0)) 0
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter3-keyset")
+(expect "right data 1671658002"  1671658002
+    (at "timestamp" 
+    (tellorflex.get-data-before 
+        (hash (base64-encode "{SpotPrice: [eth,usd]}")) (+ 1 (h.blockTime)))))
+(env-chain-data {'block-time: (h.advanceTime 1)})
+(tellorflex.submit-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (base64-encode (h.priceConversion 100.0)) 0
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
+(expect "right data 1671658003"  1671658003
+    (at "timestamp" 
+    (tellorflex.get-data-before 
+        (hash (base64-encode "{SpotPrice: [eth,usd]}")) (+ 1 (h.blockTime)))))
+(env-chain-data {'block-time: (h.advanceTime 1)})
+(tellorflex.submit-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (base64-encode (h.priceConversion 100.0)) 0
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+(expect "right data 1671658004"  1671658004
+    (at "timestamp" 
+    (tellorflex.get-data-before 
+        (hash (base64-encode "{SpotPrice: [eth,usd]}")) (+ 1 (h.blockTime)))))
+(expect "No timestamps available" {"value": "", "timestamp": 0} 
+    (tellorflex.get-data-before (hash (base64-encode "{SpotPrice: [eth,usd]}")) 1671658001))
+(expect "Correct timestamp: 1671658001" {"value": (base64-encode (h.priceConversion 100.0)),"timestamp": 1671658001} 
+    (tellorflex.get-data-before (hash (base64-encode "{SpotPrice: [eth,usd]}")) 1671658002))
+(expect "Correct timestamp: 1671658002" {"value": (base64-encode (h.priceConversion 100.0)),"timestamp": 1671658002} 
+    (tellorflex.get-data-before (hash (base64-encode "{SpotPrice: [eth,usd]}")) 1671658003))
+(expect "Correct timestamp: 1671658003" {"value": (base64-encode (h.priceConversion 100.0)),"timestamp": 1671658003} 
+    (tellorflex.get-data-before (hash (base64-encode "{SpotPrice: [eth,usd]}")) 1671658004))
+(expect "Correct timestamp: 1671658004" {"value": (base64-encode (h.priceConversion 100.0)),"timestamp": 1671658004} 
+    (tellorflex.get-data-before (hash (base64-encode "{SpotPrice: [eth,usd]}")) 1671658005))
+(expect "Correct timestamp: 1671658004" {"value": (base64-encode (h.priceConversion 100.0)),"timestamp": 1671658004} 
+    (tellorflex.get-data-before (hash (base64-encode "{SpotPrice: [eth,usd]}")) 1671658006))

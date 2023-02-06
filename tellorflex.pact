@@ -1,11 +1,11 @@
 ; tellorflex on kadena
-(namespace (read-msg 'ns))
+(namespace (read-msg "ns"))
   (if (read-msg "upgrade")
     "Upgrading contract"
 
     [
       (enforce-keyset (read-keyset "tellor-admin-keyset"))
-      (define-keyset "free.tellor-admin-keyset" (read-keyset "tellor-admin-keyset"))
+      (define-keyset (+ (read-msg "ns") ".tellor-admin-keyset") (read-keyset "tellor-admin-keyset"))
     ]
   )
 
@@ -23,27 +23,68 @@
     [ (defproperty owner-authorized (authorized-by "free.tellor-admin-keyset"))
     ]
     (implements free.i-flex)
-; *****************************************************************************
-; *                                                                           *
-; *                          Constants                                        *
-; *                                                                           *
-; *****************************************************************************
+
+; ***************************CAPABILITIES**************************************
+  (defcap TELLOR ()
+    @doc "Enforce only owner."
+    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".tellor-admin-keyset")))
+  )
+  (defcap PRIVATE () true )
+  (defcap STAKER (account-name:string)
+    (enforce-guard (at 'guard (read staker-details account-name)))
+    (compose-capability (PRIVATE)) 
+  )
+  (defcap GOV_GUARD ()
+    (enforce-guard (at "guard" (read gov-guard "gov-guard")))
+    (compose-capability (PRIVATE)) 
+  )
+; ***************************EVENT-CAPS****************************************
+  (defcap NewReport 
+    (query-id:string
+      time:integer
+      value:string
+      nonce:integer
+      query-data:string
+      reporter:string)
+      @event true
+  )
+  (defcap NewStakeAmount
+    (new-stake-amount:integer)
+    @event true
+  )
+  (defcap NewStaker 
+    (staker:string
+      amount:integer)
+      @event true
+  )
+  (defcap ReporterSlashed
+    (reporter:string
+      recipient:string
+      slashed-amount:integer)
+      @event true
+  )
+  (defcap StakeWithdrawn
+    (staker:string)
+    @event true
+  )
+  (defcap StakeWithdrawRequested
+    (staker:string
+      amount:integer)
+    @event true
+  )
+  (defcap ValueRemoved
+    (query-id:string
+      timestamp:integer)
+      @event true
+  )
+; ***************************CONSTANTS*****************************************
   (defconst TIME_BASED_REWARD (* 5 (^ 10 11)))
-
   (defconst PRECISION (^ 10 12))
-
   (defconst SEVEN_DAYS 604800)
-
   (defconst THIRTY_DAYS 2592000)
-
-; *****************************************************************************
-; *                                                                           *
-; *                          Schema                                           *
-; *                                                                           *
-; *****************************************************************************
+; ***************************TABLE-SCHEMA**************************************
   (defschema constructor-schema
     tellorflex-account:string
-    token:module{fungible-v2}
     accumulated-reward-per-share:integer
     minimum-stake-amount:integer
     reporting-lock:integer
@@ -86,11 +127,7 @@
     governance:module{i-governance})
   (defschema gov-guard-schema
     guard:guard)
-; *****************************************************************************
-; *                                                                           *
-; *                          Object-Schema                                    *
-; *                                                                           *
-; *****************************************************************************
+; ***************************OBJECT-SCHEMA*************************************
   (defschema timestamp-dispute-object
     timestamp:integer
     disputed:bool)
@@ -100,134 +137,74 @@
     start:integer
     end:integer
     timestamp-before:integer
-    timestamps:[object{timestamp-dispute-object}]
+    reports:[object{timestamp-dispute-object}]
     disputed:bool)
-; *****************************************************************************
-; *                                                                           *
-; *                          Tables                                           *
-; *                                                                           *
-; *****************************************************************************
+; ***************************TABLES********************************************
   (deftable staker-details:{stake-info})
   (deftable reports-submitted-count:{reports-submitted-by-queryid})
   (deftable reports:{report})
   (deftable timestamps:{timestamps-schema})
   (deftable global-variables:{constructor-schema})
   (deftable governance-table:{governance-schema})
-  (deftable gov-guard:{gov-guard-schema})
-
-; *****************************************************************************
-; *                                                                           *
-; *                          Capabilities                                     *
-; *                                                                           *
-; *****************************************************************************
-  (defcap TELLOR ()
-    @doc "Enforce only owner."
-    (enforce-guard (keyset-ref-guard "free.tellor-admin-keyset"))
-  )
-
-  (defcap PRIVATE () true )
-
-  (defcap STAKER (account-name:string)
-    (enforce-keyset (read-keyset account-name))
-    (enforce-guard (at 'guard (read staker-details account-name)))
-    (compose-capability (PRIVATE)) )
-
-  (defcap GOV_GUARD ()
-    (enforce-guard (at 'guard (read gov-guard 'gov-guard)))
-    (compose-capability (PRIVATE)) )
-; *****************************************************************************
-; *                                                                           *
-; *                          Guard                                            *
-; *                                                                           *
-; *****************************************************************************
-  (defun capping:bool () (require-capability (PRIVATE)) )
-
-  (defun create-flex-guard:guard () (create-user-guard (capping)) )
-
-; *****************************************************************************
-; *                                                                           *
-; *                          Global-vars getter functions                     *
-; *                                                                           *
-; *****************************************************************************
+  (deftable gov-guard:{gov-guard-schema}) 
+; ***************************GUARDS********************************************
+  (defun private-user-cap:bool () (require-capability (PRIVATE)) )
+  (defun create-flex-guard:guard () (create-user-guard (private-user-cap)) )
+; ***************************Global-GETTERS************************************
   (defun tellorflex-account:string ()
-    (at 'tellorflex-account (read global-variables 'global-vars))
+    (at "tellorflex-account" (read global-variables "global-vars"))
   )
-
-  (defun token:module{fungible-v2} ()
-    (at 'token (read global-variables 'global-vars))
-  )
-
   (defun get-governance-module:module{i-governance} ()
-    (at 'governance (read governance-table 'governance))
+    (at "governance" (read governance-table "governance"))
   )
-
   (defun accumulated-reward-per-share ()
-    (at 'accumulated-reward-per-share (read global-variables 'global-vars))
+    (at "accumulated-reward-per-share" (read global-variables "global-vars"))
   )
-
   (defun minimum-stake-amount:decimal ()
-    (at 'minimum-stake-amount (read global-variables 'global-vars))
+    (at "minimum-stake-amount" (read global-variables "global-vars"))
   )
-
   (defun reporting-lock:integer ()
-    (at 'reporting-lock (read global-variables 'global-vars))
+    (at "reporting-lock" (read global-variables "global-vars"))
   )
-
   (defun reward-rate:integer ()
-    (at 'reward-rate (read global-variables 'global-vars))
+    (at "reward-rate" (read global-variables "global-vars"))
   )
-
   (defun stake-amount:integer ()
-    (at 'stake-amount (read global-variables 'global-vars))
+    (at "stake-amount" (read global-variables "global-vars"))
   )
-
   (defun stake-amount-dollar-target:integer ()
-    (at 'stake-amount-dollar-target (read global-variables 'global-vars))
+    (at "stake-amount-dollar-target" (read global-variables "global-vars"))
   )
-
   (defun staking-rewards-balance:integer ()
-    (at 'staking-rewards-balance (read global-variables 'global-vars))
+    (at "staking-rewards-balance" (read global-variables "global-vars"))
   )
-
   (defun staking-token-price-query-id:string ()
-    (at 'staking-token-price-query-id (read global-variables 'global-vars))
+    (at "staking-token-price-query-id" (read global-variables "global-vars"))
   )
-
   (defun time-based-reward:integer ()
     TIME_BASED_REWARD
   )
-
   (defun time-of-last-allocation:integer ()
-    (at 'time-of-last-allocation (read global-variables 'global-vars))
+    (at "time-of-last-allocation" (read global-variables "global-vars"))
   )
-
   (defun time-of-last-new-value:integer ()
-    (at 'time-of-last-new-value (read global-variables 'global-vars))
+    (at "time-of-last-new-value" (read global-variables "global-vars"))
   )
-
   (defun total-reward-debt:integer ()
-    (at 'total-reward-debt (read global-variables 'global-vars))
+    (at "total-reward-debt" (read global-variables "global-vars"))
   )
-
   (defun total-stake-amount:integer ()
-    (at 'total-stake-amount (read global-variables 'global-vars))
+    (at "total-stake-amount" (read global-variables "global-vars"))
   )
-
   (defun total-stakers:integer ()
-    (at 'total-stakers (read global-variables 'global-vars))
+    (at "total-stakers" (read global-variables "global-vars"))
   )
-
   (defun to-withdraw:integer ()
-    (at 'to-withdraw (read global-variables 'global-vars))
+    (at "to-withdraw" (read global-variables "global-vars"))
   )
-; *****************************************************************************
-; *                                                                           *
-; *                          Main functions                                   *
-; *                                                                           *
-; *****************************************************************************
+; ***************************MAIN-FUNCTIONS************************************
   (defun constructor:string (
     tellorflex-account:string
-    token:module{fungible-v2}
     reporting-lock:integer
     stake-amount-dollar-target:integer
     staking-token-price:integer
@@ -240,7 +217,6 @@
       (let ((potential-amount (/ stake-amount-dollar-target staking-token-price)))
         (insert global-variables 'global-vars
           { 'tellorflex-account: tellorflex-account
-          , 'token: token
           , 'accumulated-reward-per-share: 0
           , 'minimum-stake-amount: minimum-stake-amount
           , 'reporting-lock: reporting-lock
@@ -261,11 +237,10 @@
         )
       )
 
-      (token::create-account tellorflex-account (create-flex-guard))
+      (coin.create-account tellorflex-account (create-flex-guard))
       "Global variables set!"
     )
   )
-
   (defun init-gov-guard:string (guard:guard)
     ; fails if governance hasn't been initialized
     (get-governance-module)
@@ -273,13 +248,11 @@
     (insert gov-guard 'gov-guard {'guard: guard})
     "Gov guard registered"
   )
-
   (defun init (governance:module{i-governance})
     @doc "Allows the owner to initialize the governance (flex addy needed for governance deployment)"
     (with-capability (TELLOR)
       (insert governance-table 'governance { 'governance: governance }))
   )
-
   (defun add-staking-rewards (account:string amount:integer)
     @doc "Funds the flex contract with staking rewards (autopay and miniting) anyone can add at will"
     (with-capability (PRIVATE)
@@ -291,7 +264,6 @@
             { 'reward-rate: (/ (calculate-reward-rate) THIRTY_DAYS)})
     )
   )
-
   (defun add-staker (staker:string guard:guard)
     (require-capability (PRIVATE))
     (with-default-read staker-details staker
@@ -330,7 +302,6 @@
         , 'guard: guarded
         }))
   )
-
   (defun deposit-stake (staker:string guard:guard amount:integer)
     @doc "Allows a reporter to submit stake"
     (let ((governance:module{i-governance} (get-governance-module))
@@ -379,9 +350,9 @@
           (update staker-details staker { 'start-date: block-time } )
        )
      )
+    (emit-event (NewStaker staker amount))
    )
   )
-
   (defun remove-value:string (query-id:string timestamp:integer)
     @doc "Remove disputed value only by governance"
     (with-capability (GOV_GUARD)
@@ -405,9 +376,9 @@
             )
           )
       )
-    ) (format "value for {} at {} removed" [query-id timestamp])
+      (emit-event (ValueRemoved query-id timestamp))
+    )
   )
-
   (defun request-staking-withdraw (staker:string amount:integer)
     @doc "Allows a reporter to request to withdraw their stake"
     (let ((block-time (block-time-in-seconds))
@@ -426,10 +397,10 @@
              )
            (update global-variables 'global-vars
             { 'to-withdraw: (+ to-withdraw amount)})
+          (emit-event (StakeWithdrawRequested staker amount))
         )
     )
   )
-
   (defun slash-reporter:integer (reporter:string recipient:string)
     (with-capability (GOV_GUARD)
       (with-read staker-details reporter
@@ -445,6 +416,7 @@
 
                 (update staker-details reporter {'locked-balance: locked-bal})
                 (update global-variables 'global-vars {'to-withdraw: withdraw-bal})
+                (emit-event (ReporterSlashed reporter recipient stake-amount))
                 stake-amount
             )
             (if (>= (+ locked-balance staked-balance) stake-amount)
@@ -453,16 +425,18 @@
                   (transfers-from-flex stake-amount recipient)
                   (update staker-details reporter {'locked-balance: 0})
                   (update global-variables 'global-vars {'to-withdraw: withdraw-bal})
+                  (emit-event (ReporterSlashed reporter recipient stake-amount))
                   stake-amount
                 )
                 (let ((amount (+ staked-balance locked-balance))
                        (withdraw-bal (- to-withdraw locked-balance)))
 
                     (update-stake-and-pay-rewards reporter 0)
-                    (transfers-from-flex amount reporter)
+                    (transfers-from-flex amount recipient)
 
                     (update global-variables 'global-vars { 'to-withdraw: withdraw-bal })
                     (update staker-details reporter { 'locked-balance: 0 })
+                    (emit-event (ReporterSlashed reporter recipient amount))
                     amount
                 )
             )
@@ -471,7 +445,6 @@
       )
     )
   )
-
   (defun submit-value
     (query-id:string
      value:string
@@ -541,39 +514,35 @@
           )
         )
       )
+      (emit-event (NewReport query-id block-time value nonce query-data staker))
     )
   )
-
   (defun update-stake-amount ()
     @doc "Updates the stake amount after retrieving the 12 hour old price"
-    (with-default-read timestamps (staking-token-price-query-id)
-      { 'timestamps: [] } { 'timestamps := timestamps }
-      (if (> (length timestamps) 0)
-          (let* ((twelve-hour-price
-                  (get-data-before
-                    (staking-token-price-query-id)
-                    (- (block-time-in-seconds) (reporting-lock)))))
-            (if (= twelve-hour-price {"value": "", "timestamp":0}) "no value"
-                (let* ((stake-amount (stake-amount))
-                      (minimum-stake-amount (minimum-stake-amount))
-                      (stake-amount-dollar-target (stake-amount-dollar-target))
-                      (price-decoded (str-to-int 10 (base64-decode (at 'value twelve-hour-price))))
-                      (adjusted-stake-amount
-                        (/ (* stake-amount-dollar-target PRECISION)  price-decoded)))
-                  (enforce (and? (<=  (precision 0.01)) (> (precision 1000000.0)) price-decoded)
-                  "invalid staking token price")
-                  (if (< adjusted-stake-amount minimum-stake-amount)
-                    (update global-variables 'global-vars {'stake-amount: minimum-stake-amount})
-                    (update global-variables 'global-vars {'stake-amount: adjusted-stake-amount})
-                  )
-                )
+    (let* ((twelve-hour-price
+            (get-data-before
+              (staking-token-price-query-id)
+              (- (block-time-in-seconds) (reporting-lock)))))
+      (if (= twelve-hour-price {"value": "", "timestamp":0}) 
+          (format "No value available for staking token {}"
+            [(staking-token-price-query-id)])
+          (let* ((stake-amount (stake-amount))
+                (minimum-stake-amount (minimum-stake-amount))
+                (stake-amount-dollar-target (stake-amount-dollar-target))
+                (price-decoded (str-to-int 10 (base64-decode (at "value" twelve-hour-price))))
+                (adjusted-stake-amount
+                  (/ (* stake-amount-dollar-target PRECISION)  price-decoded)))
+            (enforce (and? (<=  (precision 0.01)) (> (precision 1000000.0)) price-decoded)
+            "invalid staking token price")
+            (if (< adjusted-stake-amount minimum-stake-amount)
+              (update global-variables "global-vars" {"stake-amount": minimum-stake-amount})
+              (update global-variables "global-vars" {"stake-amount": adjusted-stake-amount})
             )
           )
-          "no price available"
       )
+      (emit-event (NewStakeAmount (stake-amount)))
     )
   )
-
   (defun withdraw-stake (staker:string)
     @doc "Withdraws a reporter's stake after the lock period expires"
     (with-capability (STAKER staker)
@@ -586,50 +555,50 @@
 
         (update staker-details staker { "locked-balance": 0 } )
 
-        (update global-variables 'global-vars
-        { 'to-withdraw: (- (to-withdraw) locked-balance )})
+        (update global-variables "global-vars"
+        { "to-withdraw": (- (to-withdraw) locked-balance )})
       )
+      (emit-event (StakeWithdrawn staker))
     )
   )
-; *****************************************************************************
-; *                                                                           *
-; *                          Getter functions                                 *
-; *                                                                           *
-; *****************************************************************************
+
+; ***************************GETTERS*******************************************
   (defun get-block-number-by-timestamp:integer (query-id:string timestamp:integer)
     @doc "Returns the block number at a given timestamp"
     (try 0 (at 'block-height (read reports (concatenate query-id timestamp))))
   )
-
   (defun get-current-value (query-id:string)
     @doc "Get last reported value for query id"
     (get-data-before query-id (plus-one (block-time-in-seconds)) )
   )
-
-  (defun get-data-before:object{i-flex.data-before-value}
-    (query-id:string timestamp:integer)
-    @doc "Retrieves the latest value for the queryId before the specified timestamp"
-    (let* ((data-before (data-before query-id timestamp)))
-      (if (= {'value: "", 'timestamp: 0} data-before) data-before
-      (let* ((timestamp-before (at 'timestamp-before data-before))
-             (found (at 'found data-before))
-             (not-disputed (not (at 'disputed data-before))))
-        (if (and found not-disputed)
-          {'value: (at 'value (read reports (concatenate query-id timestamp-before)))
-          , 'timestamp: timestamp-before}
-          {'value: "", 'timestamp: 0}
-        )
+  (defun get-data-before:object{i-flex.data-before-value} (query-id:string timestamp:integer)
+    (with-capability (PRIVATE)
+      (let* ((reports 
+            (try [] (at "timestamps" (read timestamps query-id))))
+          (count (length reports)))
+        (if (> count 0)
+            (let* ((search 
+                    (fold (binary-search)
+                      { "found": false, "target": timestamp, "start": 0, "end": (- count 1)
+                      , "timestamp-before": 0, "reports": reports, "disputed": true }
+                      (enumerate 0 (+ (log 2 count) 1))))
+                  (timestamp-before (at "timestamp-before" search)))
+              (if (and (at "found" search) (not (at "disputed" search)))
+                  { "value": (retrieve-data query-id timestamp-before)
+                  , "timestamp": timestamp-before }
+                  { "value": "", "timestamp": 0 }
+              )
+            )
+            { "value": "", "timestamp": 0 }
         )
       )
     )
   )
-
   (defun get-new-value-count-by-query-id:integer (query-id:string)
     @doc "Get the number of values submitted for a query id"
     (let ((timestamps (at 'timestamps (read timestamps query-id))))
       (length timestamps) )
   )
-
   (defun get-pending-reward-by-staker:integer (staker:string)
     @doc "Returns the pending staking reward for a given address"
     (with-read staker-details staker
@@ -646,7 +615,6 @@
             (vote-tally (if (> number-of-votes 0) (governance::get-vote-tally-by-address staker) 0)))
           (/ (* pending-reward (- vote-tally start-vote-count)) number-of-votes)))
   )
-
   (defun get-real-staking-rewards-balance:integer ()
     @doc "Returns the real staking rewards balance after accounting for unclaimed rewards"
     (with-read global-variables 'global-vars
@@ -663,79 +631,62 @@
        )
     )
   )
-
   (defun get-report-details (query-id:string timestamp:integer)
     (with-read reports (concatenate query-id timestamp)
       { 'reporter := reporter , 'is-disputed := is-disputed }
       { 'reporter: reporter , 'disputed: is-disputed }
     )
   )
-
   (defun get-reporter-by-timestamp:string (query-id:string timestamp:integer)
     (at 'reporter (read reports (concatenate query-id timestamp)))
   )
-
   (defun get-reporter-last-timestamp (reporter:string)
     (at 'reporter-last-timestamp (read staker-details reporter))
   )
-
   (defun get-reports-submitted-by-address:integer (reporter:string)
     (at 'reports-submitted (read staker-details reporter))
   )
-
   (defun get-reports-submitted-by-address-and-queryId:integer
     (reporter:string query-id:string)
     (at 'reports-submitted-by-queryid
       (read reports-submitted-count (+ query-id reporter)))
   )
-
   (defun get-staker-info:object (reporter:string)
     @doc "Get staker info details"
     (read staker-details reporter)
   )
-
   (defun get-timestampby-query-id-and-index:integer (query-id:string index:integer)
     @doc "Gets the timestamp for the value based on their index"
     (at 'timestamp (at index (at 'timestamps (read timestamps query-id))))
   )
-
   (defun get-timestamp-index-by-timestamp:integer (query-id:string timestamp:integer)
     (at 'index (read reports (concatenate query-id timestamp)))
   )
-
   (defun get-total-time-based-rewards-balance:integer ()
     (with-read global-variables 'global-vars
       { 'total-stake-amount := total-stake-amount
       , 'staking-rewards-balance := staking-rewards-balance
       , 'to-withdraw := to-withdraw
       }
-      (let ((token:module{fungible-v2} (token)))
       (-
-        (precision (token::get-balance (tellorflex-account)))
-        (fold (+) to-withdraw [total-stake-amount staking-rewards-balance]))
-      ))
+        (precision (coin.get-balance (tellorflex-account)))
+        (fold (+) to-withdraw [total-stake-amount staking-rewards-balance])
+      )  
+    )
   )
-
   (defun is-in-dispute:bool (query-id:string timestamp:integer)
       (at 'is-disputed (read reports (concatenate query-id timestamp)))
   )
-
   (defun retrieve-data:string (query-id:string timestamp:integer)
       (at 'value (read reports (concatenate query-id timestamp)))
   )
-; *****************************************************************************
-; *                                                                           *
-; *                          Private functions                                *
-; *                                                                           *
-; *****************************************************************************
+; ***************************INTERNAL-FUNCTIONS********************************
   (defun transfers-from-flex (amount:integer to:string)
     (require-capability (PRIVATE))
     (if (> amount 0)
-        (let ((token:module{fungible-v2} (token))
-              (flex (tellorflex-account)))
-          (enforce (> amount 0) "Amount must be greater than zero")
-          (install-capability (token::TRANSFER flex to (to-decimal amount)))
-          (token::transfer flex to (to-decimal amount))
+        (let ((flex (tellorflex-account)))
+          (install-capability (coin.TRANSFER flex to (to-decimal amount)))
+          (coin.transfer flex to (to-decimal amount))
         )
         "nothing to transfer"
     )
@@ -743,44 +694,40 @@
   (defun transfers-to-flex (amount:integer from:string)
     (require-capability (PRIVATE))
     (if (> amount 0)
-        (let ((token:module{fungible-v2} (token)))
-          (enforce (> amount 0) "Amount must be greater than zero")
-          (token::transfer from (tellorflex-account) (to-decimal amount))
-        )
+        (coin.transfer from (tellorflex-account) (to-decimal amount))
         "nothing to transfer"
     )
   )
-   (defun update-rewards ()
-     (require-capability (PRIVATE))
-     (with-read global-variables 'global-vars
-       { 'time-of-last-allocation := time-of-last-allocation
-       , 'reward-rate := reward-rate
-       , 'total-stake-amount := total-stake-amount
-       , 'total-reward-debt := total-reward-debt
-       , 'staking-rewards-balance := staking-rewards-balance
-       , 'accumulated-reward-per-share := accumulated-reward-per-share }
-       (let ((block-time (block-time-in-seconds)))
-          (if (= time-of-last-allocation block-time)
-              "time-of-last-allocation equals block-time"
-              (if (or? (= total-stake-amount) (= reward-rate) 0)
-                  (update global-variables 'global-vars
-                    { 'time-of-last-allocation: block-time } )
-                  (let ((accumulated-reward
-                          (accumulated-reward total-stake-amount total-reward-debt) ))
-                    (if (>= accumulated-reward staking-rewards-balance)
-                        (update global-variables 'global-vars
-                          { 'accumulated-reward-per-share:
-                          (pending-new-accumulated-reward-per-share
-                            accumulated-reward-per-share
-                            total-stake-amount)
-                          , 'reward-rate: 0 })
-             (update global-variables 'global-vars { 'accumulated-reward-per-share: (new-accumulated-reward-per-share)})))))
+  (defun update-rewards ()
+    (require-capability (PRIVATE))
+    (with-read global-variables 'global-vars
+      { 'time-of-last-allocation := time-of-last-allocation
+      , 'reward-rate := reward-rate
+      , 'total-stake-amount := total-stake-amount
+      , 'total-reward-debt := total-reward-debt
+      , 'staking-rewards-balance := staking-rewards-balance
+      , 'accumulated-reward-per-share := accumulated-reward-per-share }
+      (let ((block-time (block-time-in-seconds)))
+        (if (= time-of-last-allocation block-time)
+            "time-of-last-allocation equals block-time"
+            (if (or? (= total-stake-amount) (= reward-rate) 0)
+                (update global-variables 'global-vars
+                  { 'time-of-last-allocation: block-time } )
+                (let ((accumulated-reward
+                        (accumulated-reward total-stake-amount total-reward-debt) ))
+                  (if (>= accumulated-reward staking-rewards-balance)
+                      (update global-variables 'global-vars
+                        { 'accumulated-reward-per-share:
+                        (pending-new-accumulated-reward-per-share
+                          accumulated-reward-per-share
+                          total-stake-amount)
+                        , 'reward-rate: 0 })
+            (update global-variables 'global-vars { 'accumulated-reward-per-share: (new-accumulated-reward-per-share)})))))
 
-       (update global-variables 'global-vars { 'time-of-last-allocation: block-time})
-       )
-     )
-   )
-
+      (update global-variables 'global-vars { 'time-of-last-allocation: block-time})
+      )
+    )
+  )
   (defun update-stake-and-pay-rewards (staker:string new-staked-balance:integer)
     (require-capability (PRIVATE))
     (update-rewards)
@@ -874,7 +821,6 @@
       )
     )
   )
-
   (defun get-updated-accumulated-reward-per-share:integer ()
     (require-capability (PRIVATE))
     (with-read global-variables 'global-vars
@@ -898,11 +844,7 @@
       )
     )
   )
-; *****************************************************************************
-; *                                                                           *
-; *                          Helper functions                                 *
-; *                                                                           *
-; *****************************************************************************
+; ***************************HELPER-FUNCTIONS**********************************
   (defun accumulated-reward:integer
     (total-stake-amount:integer total-reward-debt:integer)
     (require-capability (PRIVATE))
@@ -911,15 +853,13 @@
         PRECISION )
       total-reward-debt )
   )
-
   (defun block-time-in-seconds:integer ()
     (str-to-int 10 (format-time "%s" (at 'block-time (chain-data))))
   )
-
   (defun calculate-time-based-reward:decimal (block-time:integer)
+    (require-capability (PRIVATE))
     (with-read global-variables 'global-vars
-      { 'token := token:module{fungible-v2}
-      , 'total-stake-amount := total-stake-amount
+      { 'total-stake-amount := total-stake-amount
       , 'staking-rewards-balance := staking-rewards-balance
       , 'to-withdraw := to-withdraw
       , 'time-of-last-new-value := time-of-last-new-value
@@ -927,7 +867,7 @@
 
       (let* ((reward (/ (*
               (- block-time time-of-last-new-value) time-based-reward) 300))
-             (contract-balance (token::get-balance (tellorflex-account)))
+             (contract-balance (coin.get-balance (tellorflex-account)))
              (total-time-based-rewards-balance
               (- (precision contract-balance)
                 (fold (+) total-stake-amount
@@ -943,7 +883,6 @@
       )
     )
   )
-
   (defun calculate-reward-rate:integer ()
     (require-capability (PRIVATE))
     (with-read global-variables 'global-vars
@@ -958,24 +897,20 @@
       )
     )
   )
-
   (defun concatenate (query-id:string timestamp:integer)
     (+ (+ query-id "-") (int-to-str 10 timestamp))
   )
-
   (defun plus-one:integer (amount:integer)
     (+ amount 1)
   )
-
   (defun precision:integer (amount:decimal)
     (round (* amount PRECISION))
   )
-
   (defun to-decimal:decimal (amount:integer)
     (/ (/ amount 1.0) PRECISION)
   )
-
   (defun new-accumulated-reward-per-share:integer ()
+    (require-capability (PRIVATE))
     (with-read global-variables 'global-vars
       { 'time-of-last-allocation := time-of-last-allocation
       , 'reward-rate := reward-rate
@@ -994,184 +929,96 @@
         )
     )
   )
-
   (defun pending-new-accumulated-reward-per-share:integer
     (reward-per-share:integer total-stake:integer)
     (require-capability (PRIVATE))
     (+ reward-per-share (/ (* (calculate-reward-rate) PRECISION) total-stake))
   )
-
-  (defun search-data-before
-    (search-object:object{binary-search-object} _:integer)
-      (if (and (at 'found search-object) (not (at 'disputed search-object)))
-          search-object
-          (let* ((timestamps (at 'timestamps search-object))
-                 (target (at 'target search-object))
-                 (start (at 'start search-object))
-                 (end (at 'end search-object))
-                 (middle (/ (- end start) (+ (+ 2 1) start))))
-
-              (if (< (at 'timestamp (at middle timestamps)) target)
-                  (if (>= (at 'timestamp (at (+ middle 1) timestamps)) target)
-                      (if (not (at 'disputed (at middle timestamps)))
-                          { 'found: true
-                          , 'target: target
-                          , 'start: (+ middle 1)
-                          , 'end: end
-                          , 'timestamp-before: (at 'timestamp (at middle timestamps))
-                          , 'timestamps: timestamps
-                          , 'disputed: (at 'disputed (at middle timestamps))
-                          }
-                          (if (> middle 0)
-                              (fold (search-if-disputed)
-                                    { 'found: true
-                                    , 'target: target
-                                    , 'start: (+ middle 1)
-                                    , 'end: middle
-                                    , 'timestamp-before: (at 'timestamp (at middle timestamps))
-                                    , 'timestamps: timestamps
-                                    , 'disputed: (at 'disputed (at middle timestamps))
-                                    }
-                                    (enumerate (+ 1 (log 2 (+ middle 1))) 0))
-                              { 'found: true
-                              , 'target: target
-                              , 'start: (+ middle 1)
-                              , 'end: middle
-                              , 'timestamp-before: (at 'timestamp (at middle timestamps))
-                              , 'timestamps: timestamps
-                              , 'disputed: (at 'disputed (at middle timestamps))
-                              }
-                          )
-                      )
-                      { 'found: false
-                      , 'target: target
-                      , 'start: (+ middle 1)
-                      , 'end: end
-                      , 'timestamp-before: (at 'timestamp (at middle timestamps))
-                      , 'timestamps: timestamps
-                      , 'disputed: (at 'disputed (at middle timestamps))
-                      }
-                  )
-                  (if (< (at 'timestamp (at (- middle 1) timestamps)) target)
-                      (if (> middle 0)
-                          (fold (search-if-disputed)
-                                { 'found: true
-                                , 'target: target
-                                , 'start: (+ middle 1)
-                                , 'end: middle
-                                , 'timestamp-before: (at 'timestamp (at middle timestamps))
-                                , 'timestamps: timestamps
-                                , 'disputed: (at 'disputed (at middle timestamps))
-                                }
-                                (enumerate (+ 1 (log 2 (+ middle 1))) 0)
-                          )
-                          { 'found: false
-                          , 'target: 0
-                          , 'start: 0
-                          , 'end: 0
-                          , 'timestamp-before: 0
-                          , 'timestamps: [{'timestamp:0,'disputed:true}]
-                          , 'disputed: true
-                          }
-                      )
-                      { 'found: false
-                      , 'target: target
-                      , 'start: start
-                      , 'end: (- middle 1)
-                      , 'timestamp-before: (at 'timestamp (at middle timestamps))
-                      , 'timestamps: timestamps
-                      , 'disputed: (at 'disputed (at middle timestamps))
-                      }
-                  )
-              )
-          )
-      )
-  )
-
   (defun search-if-disputed:object{binary-search-object}
-    (search-object:object{binary-search-object} _:integer)
-      (let ((end (at 'end search-object))
-            (timestamp (at 'target search-object))
-            (timestamps (at 'timestamps search-object)))
-        (if (not (at 'disputed search-object))
-            search-object
+    (search-obj:object{binary-search-object} _:integer)
+    (require-capability (PRIVATE))
+    ;  linear search to check if timestamp is in dispute
+    (bind search-obj 
+      { "target" := timestamp
+      , "reports" := reports
+      , "end" := end
+      , "disputed" := disputed }
+      (if (not disputed) search-obj
+          (let* ((next (- end 1))
+                (next-item (at next reports)))
             { 'found: true
             , 'target: timestamp
             , 'start: 0
-            , 'end: (- end 1)
-            , 'timestamp-before: (at 'timestamp (at (- end 1) timestamps))
-            , 'timestamps: timestamps
-            , 'disputed: (at 'disputed (at (- end 1) timestamps))
+            , 'end: next
+            , 'timestamp-before: (at 'timestamp next-item)
+            , 'reports: reports
+            , 'disputed: (at 'disputed next-item)
             }
-        )
+          )
       )
+    )
   )
+  (defun binary-search:object{binary-search-object} (search-obj:object{binary-search-object} _:integer)
+    (require-capability (PRIVATE))
+    (bind search-obj
+      { "start" := start, "end" := end, "target" := time
+      , "reports" := reports }
+      (let* ((search-obj 
+              (lambda (found timestamp low high target lis is-disputed)
+                { "found": found, "target": timestamp, "start": low
+                , "end": high, "timestamp-before": target, "reports": lis
+                , "disputed": is-disputed }))
+             (found-obj 
+              (lambda (s e m) 
+                (search-obj true time s e (at "timestamp" (at m reports)) 
+                  reports (at "disputed" (at m reports))))))
 
-  (defun data-before:object{binary-search-object}
-    (query-id:string timestamp:integer)
-      (let* ((timestamps (at 'timestamps (read timestamps query-id)))
-             (count (length timestamps))
-             (end (- count 1)))
-
-            (if (>= (at 'timestamp (at 0 timestamps)) timestamp)
-              ; timestamp before doesn't exist
-              ; cause the smallest timestamp is after given timestamp
-                { 'found: false
-                , 'target: timestamp
-                , 'start: 0
-                , 'end: end
-                , 'timestamp-before: (at 'timestamp (at 0 timestamps))
-                , 'timestamps: timestamps
-                , 'disputed: true
-                }
-              ; check if last reported timestamp is less than given timestamp
-                (if (< (at 'timestamp (at end timestamps)) timestamp)
-              ; check if disputed
-              ; if not disputed timestamp has been found so return
-                    (if (not (at 'disputed (at end timestamps)))
-                        { 'found: true
-                        , 'target: timestamp
-                        , 'start: 0
-                        , 'end: end
-                        , 'timestamp-before: (at 'timestamp (at end timestamps))
-                        , 'timestamps: timestamps
-                        , 'disputed: (at 'disputed (at end timestamps))
-                        }
-               ; else search for disputed using log 2 instead of linear?!
-                        (fold (search-if-disputed)
-                              { 'found: true
-                              , 'target: timestamp
-                              , 'start: 0
-                              , 'end: end
-                              , 'timestamp-before: (at 'timestamp (at end timestamps))
-                              , 'timestamps: timestamps
-                              , 'disputed: (at 'disputed (at end timestamps))
-                              }
-                              (enumerate (+ 1 (log 2 end)) 0)
-                        )
-                    )
-                    (fold (search-data-before)
-                          { 'found: false
-                          , 'start: 0
-                          , 'end: end
-                          , 'timestamp-before: (at 'timestamp (at end timestamps))
-                          , 'timestamps: timestamps
-                          , 'target: timestamp
-                          , 'disputed: true
-                          }
-                          (enumerate (+ 1 (log 2 count)) 0)
-                    )
+        (if (>= (at "timestamp" (at start reports)) time)
+            (search-obj false time 0 0 0 reports true)
+            (if (< (at "timestamp" (at end reports)) time)
+                (if (not (at "disputed" (at end reports))) 
+                    (found-obj start end end)
+                    (fold (search-if-disputed) 
+                      (found-obj start end end)
+                      (enumerate 0 (+ 1 (log 2 end))))
+                )
+                (let* ((mid (/ (+ start end) 2))
+                        (mid-time (at mid reports)))
+                  (if (< (at "timestamp" (at mid reports)) time)
+                  ;  return the object and add mid + 1 to start
+                      (if (>= (at "timestamp" (at (+ 1 mid) reports)) time)
+                      ;  search-if-disputed
+                          (if (not (at "disputed" (at mid reports)))
+                              (found-obj start end mid)
+                              (fold (search-if-disputed) 
+                                (found-obj start mid mid)
+                                (enumerate 0 (+ 1 (log 2 mid))))
+                          )
+                          ;  return objec whilst adding mid+1 to start
+                          (search-obj false time (+ mid 1) end 0 reports true)
+                      )
+                      (if (< (at "timestamp" (at (- mid 1) reports)) time)
+                        ;  search-if-disputed
+                          (let ((mid1 (- mid 1)))
+                            (if (not (at "disputed" (at mid1 reports)))
+                                (found-obj start end mid1)
+                                (fold (search-if-disputed) 
+                                  (found-obj start mid1 mid1)
+                                  (enumerate 0 (+ 1 (log 2 mid))))
+                            )
+                          )
+                          ;  middle -1 to end
+                          (search-obj false time start (- mid 1) 0 reports true)
+                      )
+                  )            
                 )
             )
+        )
       )
+    )
   )
-
 )
-; *****************************************************************************
-; *                                                                           *
-; *                         Initialize                                        *
-; *                                                                           *
-; *****************************************************************************
+; **************************INITIALIZE*****************************************
 (if (read-msg "upgrade")
     ["upgrade"]
     [

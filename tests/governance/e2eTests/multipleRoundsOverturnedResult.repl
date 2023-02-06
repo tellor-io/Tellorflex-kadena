@@ -72,4 +72,4 @@
   (expect "" (+ 17.0 voter1-bal) (coin.get-balance "reporter1-keyset"))
   (expect "" voter2-bal (coin.get-balance "reporter2-keyset"))
   (expect "" (- balance-gov 17.0) (coin.get-balance "governance"))
-  (expect "failed" "FAILED" (at 'result (free.governance.get-vote-info 3))))
+  (expect "Vote failed" "FAILED" (at 'result (free.governance.get-vote-info 3))))

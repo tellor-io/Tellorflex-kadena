@@ -18,7 +18,7 @@
   (describe-keyset "free.reporter1-keyset")
   (free.h.precision 10))
 
-(expect-failure "there should be no previous value"
+(expect "there should be no previous value" {"value": "","timestamp": 0}
   (free.tellorflex.get-current-value
     (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
 

@@ -7,7 +7,7 @@
 
  [
    (enforce-keyset (read-keyset "tellor-admin-keyset"))
-   (define-keyset "free.tellor-admin-keyset" (read-keyset "tellor-admin-keyset"))
+   (define-keyset (+ (read-msg "ns") ".tellor-admin-keyset") (read-keyset "tellor-admin-keyset"))
  ]
 )
 
@@ -20,7 +20,7 @@
 ; *                                                                           *
 ; *****************************************************************************
   (defcap GOV ()
-    (enforce-guard (keyset-ref-guard "free.tellor-admin-keyset")) )
+    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".tellor-admin-keyset"))) )
 
   (defcap PRIVATE () true )
 ; *****************************************************************************
@@ -46,7 +46,6 @@
     slashed-amount:integer)
   (defschema global-schema
     oracle:module{free.i-flex}
-    token:module{fungible-v2}
     team-multisig:string
     gov-account-name:string
     vote-count:integer
@@ -102,19 +101,17 @@
 ; *****************************************************************************
   (defun constructor:string (
     oracle:module{free.i-flex}
-    token:module{fungible-v2}
     team-multisig:string
     gov-account-name:string
     autopay-query-id:string )
     (insert global 'global-vars
       { 'oracle: oracle
-      , 'token: token
       , 'team-multisig: team-multisig
       , 'gov-account-name: gov-account-name
       , 'vote-count: 0
       , 'autopay-query-id: autopay-query-id })
 
-    (token::create-account gov-account-name (create-gov-guard))
+    (coin.create-account gov-account-name (create-gov-guard))
     "Global variables set!"
   )
 
@@ -131,7 +128,6 @@
     @doc "Begins a dispute for a given query id and timestamp"
     (enforce-keyset (read-keyset account))
     (let* ((tellorflex:module{free.i-flex} (tellorflex))
-           (token:module{fungible-v2} (token))
            (block-number (tellorflex::get-block-number-by-timestamp query-id timestamp))
            (stake-amount (tellorflex::stake-amount))
            (hash (hash [query-id timestamp]))
@@ -157,7 +153,7 @@
                 (let* ((calc-fee (* dispute-fee (^ 2 open-disputes)))
                        (fee (if (> calc-fee stake-amount) stake-amount calc-fee)))
                     ;  transfer fee to gov account
-                    (token::transfer account (gov-account) (float fee))
+                    (coin.transfer account (gov-account) (float fee))
                     ;  insert dispute info into dispute-info table
                     (insert dispute-info (str dispute-id)
                       { 'query-id: query-id
@@ -184,7 +180,7 @@
                     (enforce (< (- block-time prev-tally-date) ONE_DAY)
                       "New dispute round must be started within a day")
                     ;  transfer fee to gov account
-                    (token::transfer account (gov-account) (float fee))
+                    (coin.transfer account (gov-account) (float fee))
                     ;  insert vote info into vote-info table
                     (insert-vote-info (str dispute-id) hash vote-round block-time fee account)
                     ; read slashed amount and value from first round dispute
@@ -349,15 +345,14 @@
       (update vote-info (str dispute-id) { 'voters : (+ voters [voter-account])})
 
       (let* ((tellorflex:module{free.i-flex} (tellorflex))
-             (token:module{fungible-v2} (token) )
              (multisig (at 'team-multisig (read global 'global-vars)))
              (voter-stake-info (try {} (tellorflex::get-staker-info voter-account)))
              (reports-submitted (try 0
                (tellorflex::get-reports-submitted-by-address voter-account)))
              (voter-balance
-               (if (= {} voter-stake-info) (round (* (token::get-balance voter-account) (^ 10 12)))
+               (if (= {} voter-stake-info) (round (* (coin.get-balance voter-account) (^ 10 12)))
                    (fold (+) 0 [
-                   (round (* (token::get-balance voter-account) (^ 10 12)))
+                   (round (* (coin.get-balance voter-account) (^ 10 12)))
                    (at 'staked-balance voter-stake-info)
                    (at 'locked-balance voter-stake-info)]))))
             (with-capability (PRIVATE)
@@ -443,10 +438,9 @@
 ; *****************************************************************************
   (defun transfer-from-gov (account:string amount:decimal)
     (require-capability (PRIVATE))
-    (let ((token:module{fungible-v2} (token)))
-      (install-capability
-        (token::TRANSFER (gov-account) account amount))
-        (token::transfer (gov-account) account amount))
+    (install-capability
+      (coin.TRANSFER (gov-account) account amount))
+      (coin.transfer (gov-account) account amount)
   )
 
   (defun vote-passed (hash:string idx:integer)
@@ -472,8 +466,7 @@
     @doc "Internal helper function to transfer fee to each dispute round initiator"
     (require-capability (PRIVATE))
     (let* ((vote-round (at 'dispute-ids (read vote-rounds hash)))
-           (vote-id (at (- idx 1) vote-round))
-           (token:module{fungible-v2} (token)))
+           (vote-id (at (- idx 1) vote-round)))
       (with-read vote-info (str vote-id)
         { 'initiator := initiator , 'fee := fee }
 
