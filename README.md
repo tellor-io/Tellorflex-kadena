@@ -17,7 +17,7 @@
 Follow instructions in the pact repository of the Kadena org github to install the pact interpeter [Here](https://github.com/kadena-io/pact#installing-pact). Although the atom code editor is no longer maintained, it has great tools for writing code in Pact [check here for instructions](https://github.com/kadena-io/pact#atom). Checkout the [devnet-playground](./devnet-playground) folder for a full installation and contract interaction using nix package manager on linux that includes a pact install among other packages.  Step by step instructions are provided for an easy install on ubuntu 22.04. 
 
 ## Tests
-After cloning repo and installing the pact interpeter you can run tests in this folder [tests](./tests). 
+After cloning repo and installing the pact interpeter you can run tests in [tests](./tests) folder. 
 ```cli
 # Example running a file in the interpeter
 # enter the pact interpeter
