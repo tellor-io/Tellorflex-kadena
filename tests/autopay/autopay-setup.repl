@@ -1,9 +1,4 @@
-(load "../env-setup.repl")
-
-(begin-tx)
-(load "../../query-data-storage.pact")
-(load "../../autopay.pact")
-(commit-tx)
+(load "../governance/governance-setup.repl")
  
 (begin-tx)
 (namespace (read-msg "ns"))
