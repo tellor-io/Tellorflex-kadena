@@ -59,11 +59,15 @@ pact
 ```lisp
 (defun vote (dispute-id:integer supports:bool invalid:bool voter-account:string) )
 ```
-##### Currently deployed module-names on chain 1
-* [free.tellorflex](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=free.tellorflex&chain=1)
-* [free.governance](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=free.governance&chain=1)
-* [free.i-flex](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=free.i-flex&chain=1)
-* [free.i-governance](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=free.i-governance&chain=1)
+##### Currently deployed module-names on chain 1 
+(updated on Feb 8, 2023)
+```lisp
+(namespace "n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf")
+```
+* [tellorflex](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.tellorflex&chain=1)
+* [governance](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.governance&chain=1)
+* [i-flex](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.i-flex&chain=1)
+* [i-governance](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.i-governance&chain=1)
 
 ## Maintainers <a name="maintainers"> </a>
 This repository is maintained by the [Tellor team](https://github.com/orgs/tellor-io/people)
