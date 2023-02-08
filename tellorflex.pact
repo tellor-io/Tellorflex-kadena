@@ -20,9 +20,9 @@
     \  > (free.tellorflex.retrieve-value ...)"
 
   @model
-    [ (defproperty owner-authorized (authorized-by "free.tellor-admin-keyset"))
+    [ (defproperty owner-authorized (authorized-by (+ (read-msg "ns")".tellor-admin-keyset")))
     ]
-    (implements free.i-flex)
+    (implements i-flex)
 
 ; ***************************CAPABILITIES**************************************
   (defcap TELLOR ()
@@ -244,7 +244,7 @@
   (defun init-gov-guard:string (guard:guard)
     ; fails if governance hasn't been initialized
     (get-governance-module)
-    (enforce-guard (keyset-ref-guard "free.tellor-admin-keyset"))
+    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".tellor-admin-keyset")))
     (insert gov-guard 'gov-guard {'guard: guard})
     "Gov guard registered"
   )
@@ -257,11 +257,9 @@
     @doc "Funds the flex contract with staking rewards (autopay and miniting) anyone can add at will"
     (with-capability (PRIVATE)
       (transfers-to-flex amount account)
-      (with-capability (PRIVATE) (update-rewards) )
-        (update global-variables 'global-vars
-          { 'staking-rewards-balance: amount})
-          (update global-variables 'global-vars
-            { 'reward-rate: (/ (calculate-reward-rate) THIRTY_DAYS)})
+      (update-rewards)
+      (update global-variables 'global-vars { 'staking-rewards-balance: amount })
+      (update global-variables 'global-vars { 'reward-rate: (/ (calculate-reward-rate) THIRTY_DAYS)})
     )
   )
   (defun add-staker (staker:string guard:guard)
@@ -334,14 +332,14 @@
             )
             (let ((vote-count (governance::get-vote-count))
                   (vote-tally (governance::get-vote-tally-by-address staker)))
-                ;  if the staked balance is 0, update the start vote count and tally
-                (if (= staked-balance 0)
-                    (update staker-details staker
-                      { 'start-vote-count: vote-count
-                      , 'start-vote-tally: vote-tally
-                      })
-                    "Staked balance is not 0 vote tally and count not updated"
-                )
+              ;  if the staked balance is 0, update the start vote count and tally
+              (if (= staked-balance 0)
+                  (update staker-details staker
+                    { 'start-vote-count: vote-count
+                    , 'start-vote-tally: vote-tally
+                    })
+                  "Staked balance is not 0 vote tally and count not updated"
+              )
               (transfers-to-flex amount staker)
             )
           )
@@ -1029,5 +1027,12 @@
       (create-table reports-submitted-count)
       (create-table staker-details)
       (create-table timestamps)
-    ]
+      (constructor 
+        (read-string "tellorflex-account")
+        (read-integer "reporting-lock")
+        (read-integer "staking-target-price")
+        (read-integer "staking-token-price")
+        (read-integer "minimum-stake-amount")
+        (read-string "staking-token-query-id"))
+    ]    
 )

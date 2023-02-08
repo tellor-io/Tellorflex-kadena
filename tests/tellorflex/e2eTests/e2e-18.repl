@@ -16,13 +16,11 @@
   (free.tellorflex.get-total-time-based-rewards-balance))
 (expect "toWithdraw should be 0" 0
   (free.tellorflex.to-withdraw))
-(free.tellorflex.request-staking-withdraw "user-keyset" (free.h.precision 100))
+(free.tellorflex.request-staking-withdraw "user-keyset" (free.h.precision 10))
 (expect "total time based rewards balance should be 0" 0
   (free.tellorflex.get-total-time-based-rewards-balance))
-(expect "toWithdraw should be correct" (free.h.precision 100)
+(expect "toWithdraw should be correct" (free.h.precision 10)
   (free.tellorflex.to-withdraw))
-(commit-tx)
-(begin-tx)
 (free.tellorflex.submit-value (hash (base64-encode "{SpotPrice: [eth,usd]}"))
   (base64-encode (free.h.priceConversion 1000.0)) 0
   (base64-encode "{SpotPrice: [eth,usd]}") "user-keyset")
@@ -30,6 +28,5 @@
 (free.tellorflex.slash-reporter "user-keyset" "reporter2-keyset")
 (expect "total time based rewards balance should be 0" 0
   (free.tellorflex.get-total-time-based-rewards-balance))
-(expect "toWithdraw should be 0" 0
-  (free.tellorflex.to-withdraw))
-  (free.h.precision 100)
+(expect "toWithdraw should be 0" 0 (free.tellorflex.to-withdraw))
+(rollback-tx)

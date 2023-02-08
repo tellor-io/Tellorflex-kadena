@@ -66,3 +66,10 @@
   (defun get-vote-count:integer ()
     (at 'vote-count (read global 'global)))
 )
+(if (read-msg "upgrade")
+    ["upgrade"]
+    [
+      (create-table governance-mock.global)
+      (create-table governance-mock.vote-table)
+      (create-table governance-mock.vote-tally)
+    ])

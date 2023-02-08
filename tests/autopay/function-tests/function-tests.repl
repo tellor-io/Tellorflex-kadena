@@ -183,7 +183,6 @@
     (hash (base64-encode "{SpotPrice: [eth,usd]}"))
     (base64-encode (h.priceConversion 100.0)) 0
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter3-keyset")
-(h.blockTime)
 (env-chain-data {'block-time: (h.advanceTime 43201)})
 (expect-failure "msg sender must be reporter address" 
     (autopay.claim-one-time-tip "reporter1-keyset" 

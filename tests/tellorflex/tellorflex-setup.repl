@@ -1,35 +1,16 @@
-(load "../setup.repl")
-(env-data {
-  "tellor-admin-keyset": {
-    "keys": [ "tellor-keyset-public-key" ], "pred": "keys-all" },
-    "upgrade": false, "ns": "free" })
-(env-sigs [{"key": "tellor-keyset-public-key", "caps": []}])
-(env-chain-data {'block-time: (time "2022-12-21T21:26:41Z")})
+(load "../env-setup.repl")
 
-(begin-tx) ;txn 2
-(load "../../tellorflex.pact")
+(begin-tx "Deploy Modules and set governance")
+(namespace (read-msg "ns"))
 (load "../../testing/governance-mock.pact")
 
-(create-table governance-mock.global)
-(create-table governance-mock.vote-table)
-(create-table governance-mock.vote-tally)
-
-(free.tellorflex.constructor
-  "tellorflex" ;tellorflex account name in coin
-  43200 ;Reporting lock
-  (* 500 (^ 10 12)) ;Staking target price
-  (* 50 (^ 10 12)) ;Staking token price
-  (* 100 (^ 10 12)) ;Minimum stake amount
-  (hash (base64-encode "{SpotPrice: [trb,usd]}")) ;Staking token query id
-  )
-
-(free.governance-mock.constructor free.tellorflex)
+(governance-mock.constructor free.tellorflex)
 ; Check governance address not initialized in tellorflex
 (expect-failure "row not found" (free.tellorflex.get-governance-module))
 ; Input governance address in tellorflex
-(free.tellorflex.init free.governance-mock)
+(tellorflex.init free.governance-mock)
 ; Additional step that stores governance guard in tellorflex (Owner only)
-(free.governance-mock.call-tellorflex)
+(governance-mock.call-tellorflex)
 ; Expect failure when trying to input governance address again
 (expect-failure "row found for key" (free.tellorflex.init "governance place holder"))
 (commit-tx)
