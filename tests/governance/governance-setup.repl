@@ -1,17 +1,12 @@
-(load "../setup.repl")
-(env-data { "tellor-admin-keyset": { "keys": [ "tellor-keyset-public-key" ], "pred": "keys-all" }, "upgrade": false, "ns": "free" })
-(env-sigs [{"key": "tellor-keyset-public-key", "caps": []}])
-(env-chain-data {'block-time: (time "2022-12-21T21:26:41Z"), 'block-height: 1})
+(load "../env-setup.repl")
 
 (begin-tx)
-(load "../../tellorflex.pact")
+(namespace (read-string "ns"))
+(load "../../query-data-storage.pact")
+(load "../../autopay.pact")
 (load "../../governance.pact")
-
- (free.tellorflex.constructor "tellorflex" 43200 1 1 (* 10 (^ 10 12)) "iwOeUQ51Hwa5ZyJPkEccwgeK4R6EO0u02q-_4SQMLZ4")
- (free.governance.constructor free.tellorflex "" "governance" "autopay-query-id-list")
  ; Input governance address in tellorflex
- (free.tellorflex.init free.governance)
- (free.governance.register-gov-guard)
+ (tellorflex.init free.governance)
+ (governance.register-gov-guard)
  (commit-tx)
- (env-sigs [])
- (env-data {})
+

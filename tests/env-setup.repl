@@ -1,0 +1,114 @@
+(env-data 
+      { "ns": "free" 
+      , "namespace-keyset": { "keys": [ ], "pred": "keys-all" }
+      , "test-keyset": { "keys": [ ], "pred": "keys-all" } })
+(begin-tx) ;txn 0
+(define-namespace "free" (read-keyset "test-keyset") (read-keyset "namespace-keyset"))
+(namespace "free")
+(define-keyset (+ (read-msg "ns") ".tellor-admin-keyset") (read-keyset "test-keyset"))
+(commit-tx)
+;  load coin modules
+(begin-tx)
+(load "../root/fungible-v2.pact")
+(load "../root/fungible-xchain-v1.pact")
+(load "../root/coin-v5.pact")
+
+(create-table coin.coin-table)
+(create-table coin.allocation-table)
+(commit-tx)
+
+(env-chain-data {'block-time: (time "2022-12-21T21:26:41Z"), 'block-height: 1})
+(env-data 
+    { "tellor-admin-keyset": { "keys": [ "tellor-keyset-public-key" ], "pred": "keys-all" }
+    , "namespace-keyset": { "keys": [ ], "pred": "keys-all" }
+    , "test-keyset": { "keys": [ ], "pred": "keys-all" }
+    , "ns": "free"
+    , "upgrade": false
+    , "tellor-admin-keyset": { "keys": [ "tellor-keyset-public-key" ], "pred": "keys-all" }
+    , "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" }
+    , "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" }
+    , "reporter3-keyset": { "keys": [ "reporter3-public-key" ], "pred": "keys-all" }
+    , "reporter4-keyset": { "keys": [ "reporter4-public-key" ], "pred": "keys-all" } 
+    , "reporter5-keyset": { "keys": [ "reporter5-public-key" ], "pred": "keys-all" } 
+    , "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" }
+    , "tellorflex-account": "tellorflex"
+    , "reporting-lock": 43200
+    , "staking-target-price": (* 500 (^ 10 12))
+    , "staking-token-price": (* 50 (^ 10 12))
+    , "minimum-stake-amount": (* 10 (^ 10 12))
+    , "staking-token-query-id": (hash (base64-encode "{SpotPrice: [trb,usd]}"))
+    , "autopay-account-name": "autopay"
+    , "autopay-fee": 10
+    , "multisig": (describe-keyset (+ (read-msg "ns") ".tellor-admin-keyset"))
+    , "gov-account": "governance"})
+(env-sigs [
+    { "key": "tellor-keyset-public-key", "caps": []},
+    { "key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 300.0), (coin.TRANSFER "reporter1-keyset" "autopay" 100.0)]},
+    { "key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 10000.0), (coin.TRANSFER "reporter2-keyset" "autopay" 100.0)]},
+    { "key": "reporter3-keyset", "caps": [(coin.TRANSFER "reporter3-keyset" "tellorflex" 300.0), (coin.TRANSFER "reporter3-keyset" "autopay" 100.0)]},
+    { "key": "reporter4-keyset", "caps": [(coin.TRANSFER "reporter4-keyset" "tellorflex" 100.0), (coin.TRANSFER "reporter4-keyset" "autopay" 100.0)]},
+    { "key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "tellorflex" 1000.0), (coin.TRANSFER "user-keyset" "autopay" 1000.0)]},
+    { "key": "reporter1-public-key", "caps": []},
+    { "key": "reporter2-public-key", "caps": []},
+    { "key": "reporter3-public-key", "caps": []},
+    { "key": "reporter4-public-key", "caps": []},
+    { "key": "reporter5-public-key", "caps": []},
+    { "key": "user-public-key", "caps": []} ])
+
+(env-chain-data {'block-time: (time "2022-12-21T21:26:41Z")})
+(begin-tx "Define keysets")
+(namespace (read-msg "ns"))
+;  (define-keyset (+ (read-msg "ns") ".tellor-admin-keyset") (read-keyset "tellor-admin-keyset"))
+(define-keyset (+ (read-msg "ns") ".reporter1-keyset") (read-keyset "reporter1-keyset"))
+(define-keyset (+ (read-msg "ns") ".reporter2-keyset") (read-keyset "reporter2-keyset"))
+(define-keyset (+ (read-msg "ns") ".reporter3-keyset") (read-keyset "reporter3-keyset"))
+(define-keyset (+ (read-msg "ns") ".reporter4-keyset") (read-keyset "reporter4-keyset"))
+(define-keyset (+ (read-msg "ns") ".reporter5-keyset") (read-keyset "reporter5-keyset"))
+(define-keyset (+ (read-msg "ns") ".user-keyset") (read-keyset "user-keyset"))
+(commit-tx)
+(begin-tx) ;txn 4
+;  create accounts in coin for reporters to recieve funds
+(coin.create-account "reporter1-keyset" (describe-keyset (+ (read-msg "ns") ".reporter1-keyset")))
+(coin.create-account "reporter2-keyset" (describe-keyset (+ (read-msg "ns") ".reporter2-keyset")))
+(coin.create-account "reporter3-keyset" (describe-keyset (+ (read-msg "ns") ".reporter3-keyset")))
+(coin.create-account "reporter4-keyset" (describe-keyset (+ (read-msg "ns") ".reporter4-keyset")))
+(coin.create-account "reporter5-keyset" (describe-keyset (+ (read-msg "ns") ".reporter5-keyset")))
+(coin.create-account "user-keyset" (describe-keyset (+ (read-msg "ns") ".user-keyset")))
+
+;  fake capability(only available in testing) then mint tokens
+(test-capability (coin.COINBASE))
+(coin.coinbase "reporter1-keyset" (describe-keyset (+ (read-msg "ns") ".reporter1-keyset")) 1000.0)
+(coin.coinbase "reporter2-keyset" (describe-keyset (+ (read-msg "ns") ".reporter2-keyset")) 1000.0)
+(coin.coinbase "reporter3-keyset" (describe-keyset (+ (read-msg "ns") ".reporter3-keyset")) 100.0)
+(coin.coinbase "reporter4-keyset" (describe-keyset (+ (read-msg "ns") ".reporter4-keyset")) 100.0)
+(coin.coinbase "reporter5-keyset" (describe-keyset (+ (read-msg "ns") ".reporter5-keyset")) 5000.0)
+(coin.coinbase "user-keyset" (describe-keyset (+ (read-msg "ns") ".user-keyset")) 1000.0)
+(commit-tx)
+(begin-tx)
+(namespace (read-msg "ns"))
+(module h g
+  
+  (defcap g () false )
+
+  (defun advanceTime (seconds)
+   (add-time (at 'block-time (chain-data)) seconds)
+  )
+  (defun precision (number)
+    (* number (^ 10 12))
+  )
+  (defun trbPrice (multiplier) 
+    (priceConversion (* 50.0 multiplier))
+  )
+  (defun priceConversion (price:decimal)
+    (int-to-str 10 (round (* price (^ 10 12))))
+  )
+  (defun blockTime ()
+    (str-to-int 10 (format-time "%s" (at 'block-time (chain-data))))
+  )
+)
+(commit-tx)
+(begin-tx)
+(load "../i-governance.pact")
+(load "../i-flex.pact")
+(load "../tellorflex.pact")
+(commit-tx)
