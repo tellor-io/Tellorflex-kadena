@@ -29,6 +29,7 @@
   )
 ; ***************************TABLE-SCHEMA**************************************
   (defschema global-schema
+    autopay-account:string
     fee:integer
     query-ids-with-funding:[string]
   )
@@ -53,9 +54,12 @@
   (deftable query-ids-with-funding-index:{query-ids-with-funding-index-schema})
   (deftable user-tips-total:{user-tips-total-schema})
 ; ***************************MAIN-FUNCTIONS************************************
-  (defun constructor (fee:integer)
-      (insert global "global" { "fee": fee, "query-ids-with-funding": [] })
-      (coin.create-account "autopay" AUTOPAY_GUARD)
+  (defun constructor (autopay-account:string fee:integer)
+      (insert global "global" 
+      { "autopay-account": autopay-account
+      , "fee": fee
+      , "query-ids-with-funding": [] })
+      (coin.create-account autopay-account AUTOPAY_GUARD)
   )
   (defun claim-one-time-tip
     (claimant:string query-id:string timestamps:[integer])
@@ -106,19 +110,18 @@
     (enforce (= (hash query-data) query-id) "id must be hash of bytes data")
     (enforce (> amount 0) "tip must be greater than zero")
     (with-default-read tips query-id
-        { "tips": [] }
-        { "tips" := all-tips }
+        { "tips": [] }{ "tips" := all-tips }
         (if (= (length all-tips) 0)
-            [ (write tips query-id { "tips": [
-                                    { "amount": amount
-                                    , "cumulative-tips": amount
-                                    , "timestamp": (blockTime) }]} )
-              (queryDataStorage.store-data query-data) ]
+            (let ((set-vals 
+                    (lambda (tip time) 
+                    { "amount": tip
+                    , "cumulative-tips": tip, "timestamp": time})))
+              (write tips query-id { "tips": [(set-vals amount (blockTime))]})
+              (queryDataStorage.store-data query-data)
+            )
             (let (  (last-item (at (- (length all-tips) 1) all-tips))
                     (current-value-timestamp
-                        (try {"value": "", "timestamp": 0}
-                          (tellorflex.get-data-before
-                            query-id (+ (blockTime) 1) ))))
+                        (tellorflex.get-data-before query-id (+ (blockTime) 1))))
                 (bind last-item
                     { "amount" := tip-amount
                     , "cumulative-tips" := cumulative-tips
@@ -268,6 +271,10 @@
     )
   )
 ; ***************************GETTERS*******************************************
+  (defun autopay-account:string ()
+    @doc "Autopay account name in token module"
+    (at "autopay-account" (read global "global"))
+  )
   (defun blockTime:integer ()
     @doc "Block time in seconds"
     (str-to-int 10 (format-time "%s" (at 'block-time (chain-data))))
@@ -314,7 +321,7 @@
     (at "index" (read query-ids-with-funding-index query-id))
   )
   (defun get-tips-by-user (user:string)
-      (at "total" (read user-tips-total user))
+      (try 0 (at "total" (read user-tips-total user)))
   )
   (defun to-decimal:decimal (amount:integer)
     (/ (/ amount 1.0) PRECISION)
@@ -327,5 +334,8 @@
       (create-table tips)
       (create-table query-ids-with-funding-index)
       (create-table user-tips-total)
+      (constructor 
+        (read-string "autopay-account-name") 
+        (read-integer "autopay-fee"))
     ]
 )
