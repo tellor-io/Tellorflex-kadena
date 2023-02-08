@@ -65,6 +65,7 @@ pact
 (namespace "n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf")
 ```
 * [tellorflex](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.tellorflex&chain=1)
+* [autopay](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.autopay&chain=1)
 * [governance](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.governance&chain=1)
 * [i-flex](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.i-flex&chain=1)
 * [i-governance](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.i-governance&chain=1)
