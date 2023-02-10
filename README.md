@@ -59,6 +59,16 @@ pact
 ```lisp
 (defun vote (dispute-id:integer supports:bool invalid:bool voter-account:string) )
 ```
+- #### Tests
+To run tests execute shell script like so:
+
+```md
+./run-test.sh <module-name (ie tellorflex, autopay, or governance)> <Optional flag: --show-trace>
+```
+example:
+```sh
+./run-test.sh tellorflex -t
+```
 ##### Currently deployed module-names on chain 1 
 (updated on Feb 8, 2023)
 ```lisp
@@ -70,11 +80,6 @@ pact
 * [i-flex](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.i-flex&chain=1)
 * [i-governance](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_728c22eb9b4ef4d2dd923d1c609e8536154c7fbf.i-governance&chain=1)
 
-##### Tests
-To run tests, execute:
-```sh
-./run-test.sh <module-name (ie tellorflex, autopay, or governance)> <Optional flag: --show-trace>
-```
 ## Maintainers <a name="maintainers"> </a>
 This repository is maintained by the [Tellor team](https://github.com/orgs/tellor-io/people)
 

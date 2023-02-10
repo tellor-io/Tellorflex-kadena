@@ -48,7 +48,8 @@
     { "key": "reporter2-keyset", "caps": 
     [(coin.TRANSFER "reporter2-keyset" "tellorflex" 10000.0), (coin.TRANSFER "reporter2-keyset" "governance" 100.0), (coin.TRANSFER "reporter2-keyset" "autopay" 100.0)]},
     { "key": "reporter3-keyset", "caps": [(coin.TRANSFER "reporter3-keyset" "tellorflex" 300.0), (coin.TRANSFER "reporter3-keyset" "autopay" 100.0)]},
-    { "key": "reporter4-keyset", "caps": [(coin.TRANSFER "reporter4-keyset" "tellorflex" 100.0), (coin.TRANSFER "reporter4-keyset" "autopay" 100.0)]},
+    { "key": "reporter4-keyset", "caps": 
+    [(coin.TRANSFER "reporter4-keyset" "tellorflex" 100.0), (coin.TRANSFER "reporter4-keyset" "governance" 100.0), (coin.TRANSFER "reporter4-keyset" "autopay" 100.0)]},
     { "key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "tellorflex" 1000.0), (coin.TRANSFER "user-keyset" "autopay" 1000.0)]},
     { "key": "zero-bal-keyset", "caps": [(coin.TRANSFER "zero-bal-keyset" "tellorflex" 1000.0), (coin.TRANSFER "zero-bal-keyset" "governance" 1000.0)]},
     { "key": "reporter1-public-key", "caps": []},

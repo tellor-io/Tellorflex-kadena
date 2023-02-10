@@ -126,7 +126,7 @@
     "Gov guard registered"
   )
 
-  (defun begin-dispute:string 
+  (defun begin-dispute:bool 
     (account:string query-id:string timestamp:integer)
     @doc "Begins a dispute for a given query id and timestamp"
     (let* ( (block-number 
@@ -224,7 +224,7 @@
     )
   )
 
-  (defun execute-vote:string (dispute-id:integer)
+  (defun execute-vote:bool (dispute-id:integer)
     @doc "Execute vote for a given dispute ID, \
     \ finalizing the vote and transferring the fees and stake"
     (let ((vote-count (at "vote-count" (read global "global-vars"))))
@@ -338,10 +338,10 @@
                       (if (> scaled-against (+ scaled-does-support scaled-invalid))
                       "FAILED"
                       "INVALID") )) )
-              (update vote-info (str dispute-id) { "result": result })
+              (update vote-info (str dispute-id) 
+              { "result": result, "tally-date": (block-time)})
               (emit-event (VoteTallied dispute-id result initiator reporter)) )
         )
-        (update vote-info (str dispute-id) { "tally-date": (block-time) })
       )
     )
   )
@@ -450,12 +450,11 @@
             )
           )
         )
+        (write vote-tally-by-address voter-account 
+          { "vote-tally-by-address": 
+          (+ (get-vote-tally-by-address voter-account ) 1) })
         (emit-event (Voted dispute-id supports voter-account invalid))
       )
-      (with-default-read vote-tally-by-address voter-account
-        { "vote-tally-by-address": 0 } { "vote-tally-by-address" := vote-tally }
-        (write vote-tally-by-address voter-account
-          { "vote-tally-by-address": (+ vote-tally 1) })) ;token-holders
       )
     )
   )
