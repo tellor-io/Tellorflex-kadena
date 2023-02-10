@@ -1,0 +1,44 @@
+(load "./governance-setup.repl" )
+
+;  *******************************************************************
+    (print "***************************************************************************************")
+    (print "Function test: tally-votes")
+    (begin-tx)
+    (namespace (read-msg "ns"))
+    (use governance)
+    (use tellorflex)
+    (deposit-stake
+        "reporter2-keyset"
+        (describe-keyset (+ (read-msg "ns") ".reporter3-keyset"))
+        (h.precision 20))
+    (submit-value
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (base64-encode (h.priceConversion 100.0)) 0
+        (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
+    (expect-failure "Cannot tally a dispute that does not exist" (governance.tally-votes 1))
+
+    (begin-dispute "reporter1-keyset"
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (h.blockTime))
+    (commit-tx)
+    (begin-tx)
+    (namespace (read-msg "ns"))
+    (use governance)
+    (use tellorflex)
+    (governance.vote 1 true false "reporter1-keyset")
+    (expect-failure "Time for voting has not elapsed" (governance.tally-votes 1))
+    ;  advance 2 days
+    (env-chain-data {"block-time": (h.advanceTime (* 86400 2))})
+    (tally-votes 1)
+    ;  advance a day
+    (env-chain-data {"block-time": (h.advanceTime 86400)})
+    (expect-failure "Vote has already been tallied" (tally-votes 1))
+    (bind (get-vote-info 1) { "tally-date" := date, "result" := result } 
+    (expect "Tally date should be correct" (- (h.blockTime) 86400) date)
+    (expect "Vote result should be PASSED" "PASSED" result))
+    (execute-vote 1)
+    (expect-failure "Vote has already been executed" (execute-vote 1))
+    (expect "Reporter balance should be 20 short" 980.0 (coin.get-balance "reporter2-keyset"))
+    (expect "Staked balance should only be 10" (h.precision 10)
+    (at "staked-balance" (get-staker-info "reporter2-keyset")))
+    (commit-tx)

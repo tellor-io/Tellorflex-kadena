@@ -1,0 +1,79 @@
+(load "./governance-setup.repl" )
+
+;  *******************************************************************
+    (print "***************************************************************************************")
+    (print "Function test: begin-dispute")
+    (begin-tx)
+    (namespace (read-msg "ns"))
+    (use governance) (use tellorflex)
+    (deposit-stake
+        "reporter1-keyset"
+        (describe-keyset (+ (read-msg "ns") ".reporter1-keyset"))
+        (h.precision 10))
+    (expect-failure "No Value exist" (begin-dispute "reporter2-keyset"
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (h.blockTime)))
+    (submit-value
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (base64-encode (h.priceConversion 100.0)) 0
+        (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+    (expect-failure "Insufficient funds" (begin-dispute "zero-bal-keyset"
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (h.blockTime)))
+    (let ((bal1 (coin.get-balance "reporter2-keyset")))
+      (begin-dispute "reporter2-keyset"
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (h.blockTime))
+      (let ((bal2 (coin.get-balance "reporter2-keyset"))
+            (dispute (get-dispute-info 1))
+            (vote (get-vote-info 1)))
+        (expect "Vote count should be 1" 1 (get-vote-count))
+        (bind dispute 
+            {"query-id" := query-id, "timestamp" := time
+            , "value" := val, "disputed-reporter" := reporter } 
+            (expect "queryID should be correct" 
+            (hash (base64-encode "{SpotPrice: [eth,usd]}")) query-id)
+            (expect "timestamp should be correct" (h.blockTime) time)
+            (expect "value should be correct" 
+            (base64-encode (h.priceConversion 100.0)) val)
+            (expect "Disputed reporter should be reporter" "reporter1-keyset" reporter)
+            (expect "number of vote rounds should be correct" [1] 
+            (get-vote-rounds (hash [query-id time]))) )
+        (expect "initiator should be correct" (at "initiator" vote) "reporter2-keyset")
+        (expect "open disputes on ID should be correct" 1
+            (get-open-disputes-on-id (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+
+        (expect "dispute fee paid should be correct" 0.0 (- (h.precision (- bal1 bal2)) (/ (stake-amount) 10)))
+      )
+    )
+    ;  advance 2 days
+    (env-chain-data {"block-time": (h.advanceTime (* 86400 2))})
+    (tally-votes 1)
+    ;  advance 2 days
+    (env-chain-data {"block-time": (h.advanceTime (* 86400 2))})
+    (execute-vote 1)
+    ;  advance 2 days
+    (env-chain-data {"block-time": (h.advanceTime (* 86400 2))})
+    (expect-failure "New dispute round must be started within a day"
+    (begin-dispute "reporter2-keyset"
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (- (h.blockTime) (* 86400 6))))
+    (commit-tx)
+    (begin-tx)
+    (namespace (read-msg "ns"))
+    (use governance) (use tellorflex)
+    (deposit-stake
+        "reporter3-keyset"
+        (describe-keyset (+ (read-msg "ns") ".reporter3-keyset"))
+        (h.precision 10))
+    (submit-value
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (base64-encode (h.priceConversion 100.0)) 0
+        (base64-encode "{SpotPrice: [eth,usd]}")  "reporter3-keyset")
+    
+    ;  advance a day
+    (env-chain-data {"block-time": (h.advanceTime 86410)})
+    (expect-failure "Dispute must be started within reporting lock time" 
+    (begin-dispute "reporter2-keyset"
+        (hash (base64-encode "{SpotPrice: [eth,usd]}")) (- (h.blockTime) 86410)))
+    (commit-tx)

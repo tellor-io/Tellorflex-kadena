@@ -1,19 +1,4 @@
 (load "../tellorflex-setup.repl")
-(env-data {
-    "ns": "free",
-    "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" },
-    "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" },
-    "reporter3-keyset": { "keys": [ "reporter3-public-key" ], "pred": "keys-all" },
-    "reporter4-keyset": { "keys": [ "reporter4-public-key" ], "pred": "keys-all" },
-    "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" } })
-(env-sigs [
-    {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "autopay" 100.0), (coin.TRANSFER "reporter1-keyset" "tellorflex" 100.0)]},
-    {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "autopay" 100.0), (coin.TRANSFER "reporter2-keyset" "tellorflex" 100.0)]},
-    {"key": "reporter3-keyset", "caps": [(coin.TRANSFER "reporter3-keyset" "autopay" 100.0), (coin.TRANSFER "reporter3-keyset" "tellorflex" 100.0)]},
-    {"key": "reporter4-keyset", "caps": [(coin.TRANSFER "reporter4-keyset" "autopay" 100.0), (coin.TRANSFER "reporter4-keyset" "tellorflex" 100.0)]},
-    {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "autopay" 100.0)]},
-    {"key": "reporter1-public-key", "caps": []}, {"key": "reporter2-public-key", "caps": []}, {"key": "reporter3-public-key", "caps": []},
-    {"key": "reporter4-public-key", "caps": []}, {"key": "user-public-key", "caps": []}])
 
 (begin-tx)
 (print "***********************************************")
