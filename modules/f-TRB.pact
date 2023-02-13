@@ -426,5 +426,5 @@
     (create-account "admin-keyset" (describe-keyset (+ (read-msg "ns") ".admin-keyset")))
     (create-account "reporter-1" (describe-keyset (+ (read-msg "ns") ".reporter-1")))
     (mint "admin-keyset" (describe-keyset (+ (read-msg "ns") ".admin-keyset")) 1000.0)
-    (mint "reporter-1" (describe-keyset (+ (read-msg "ns") ".reporter-1")) 10000.0)
+    (mint "reporter-1" (describe-keyset (+ (read-msg "ns") ".reporter-1")) 1000.0)
   ])
