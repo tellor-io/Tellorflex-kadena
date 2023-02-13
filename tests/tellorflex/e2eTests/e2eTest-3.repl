@@ -6,37 +6,36 @@
   (begin-tx)
   (namespace (read-msg "ns"))
   ;  Deposit 2 stakes
-  (tellorflex.deposit-stake "reporter1-keyset" (describe-keyset "free.reporter1-keyset") (h.precision 10))
+  (tellorflex.deposit-stake "reporter-1" (describe-keyset "free.reporter-1") (h.precision 10))
   (tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (h.precision 10))
   ;  Resquest withdrawal 1 stake which locks it for 7 days
-  (tellorflex.request-staking-withdraw "reporter1-keyset" (h.precision 10))
+  (tellorflex.request-staking-withdraw "reporter-1" (h.precision 10))
   ;  Should still be able to submit value since one stake still available
   (tellorflex.submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
   ;  Tellorflex balance should still be 20 after request
-  (expect "Tellorflex balance should be 20 after deposits" 20.0 (coin.get-balance "tellorflex"))
+  (expect "Tellorflex balance should be 20 after deposits" 20.0 (f-TRB.get-balance "tellorflex"))
   ;  Mint tokens to tellorflex
-  (test-capability (coin.COINBASE))
   (test-capability (tellorflex.PRIVATE))
-  (coin.coinbase "tellorflex" (tellorflex.create-flex-guard) 10.0)
+  (f-TRB.mint "tellorflex" (tellorflex.create-flex-guard) 10.0)
   ;  To withdraw amount should be the amount thats requested for withdrawal
   (expect "to-withdraw amount should be 10" (h.precision 10) (tellorflex.to-withdraw))
   ;  Deposit stake with reporter that requested withdrawal 
   ;  Note doesn't reduce token balance of reporter just moves from locked to staked
-  (tellorflex.deposit-stake "reporter1-keyset" 
-    (describe-keyset "free.reporter1-keyset") (h.precision 10))
+  (tellorflex.deposit-stake "reporter-1" 
+    (describe-keyset "free.reporter-1") (h.precision 10))
   ; advance time 1 day
   (env-chain-data {'block-time: (h.advanceTime 86400)})
   ;  to withdraw amount 0 since not locked anymore
   (expect "to-withdraw amount should be go down" 0 (tellorflex.to-withdraw))
-  (expect "Tellorflex balance should be 30.0" 30.0 (coin.get-balance "tellorflex"))
+  (expect "Tellorflex balance should be 30.0" 30.0 (f-TRB.get-balance "tellorflex"))
 
   (tellorflex.submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
   ;  tokens in Tellorflex not from staking are dispersed to reporters
-  (expect-that "Balance should be less than 30.0" (> 30.0 ) (coin.get-balance "tellorflex"))
+  (expect-that "Balance should be less than 30.0" (> 30.0 ) (f-TRB.get-balance "tellorflex"))
   (rollback-tx)
 ;  **************************************************************************************************
   (print "***************************************************************************************")
@@ -57,8 +56,8 @@
   (expect "Expected reward rate should be rewards divided by 30 days" 
     (/ (h.precision 1000) 2592000) (tellorflex.reward-rate))
   ; create 2 mock disputes, vote once
-  (governance-mock.begin-dispute "reporter1-keyset" "" 0)
-  (governance-mock.begin-dispute "reporter1-keyset" "" 0)
+  (governance-mock.begin-dispute "reporter-1" "" 0)
+  (governance-mock.begin-dispute "reporter-1" "" 0)
   ; vote on dispute-id 1; disregard the other params due to structure TODO:
   (governance-mock.vote 1 false false "reporter2-keyset")
   ; deposit stake
@@ -83,7 +82,7 @@
     , "start-vote-tally": 1}(free.tellorflex.get-staker-info "reporter2-keyset"))
   ; advance time 10 days
   (env-chain-data {'block-time: (h.advanceTime (* 86400 10))})
-  (expect "Reporter balance should be 990.0; minus stake" 990.0 (coin.get-balance "reporter2-keyset"))
+  (expect "Reporter balance should be 990.0; minus stake" 990.0 (f-TRB.get-balance "reporter2-keyset"))
   ;  Stake 0; allowed because it resets time based rewards
   (tellorflex.deposit-stake "reporter2-keyset" 
     (describe-keyset "free.reporter2-keyset") 0)
@@ -106,7 +105,7 @@
                 (h.precision 1)) (h.precision 990))))
       (expect "accumulated-reward-per-share should equal expected-accumulated-reward-per-share"
         expectedAccumulatedRewardPerShare (tellorflex.accumulated-reward-per-share))
-      (expect "reporter balance" (tellorflex.to-decimal expectedBalance) (coin.get-balance "reporter2-keyset"))
+      (expect "reporter balance" (tellorflex.to-decimal expectedBalance) (f-TRB.get-balance "reporter2-keyset"))
       (expect "Total reward debt should be correct" expectedRewardDebt (tellorflex.total-reward-debt))
       (expect "Staked balance should still be 10 for reporter" 
         (h.precision 10) (at 'staked-balance staker-info))
@@ -116,7 +115,7 @@
     )
   )
   ;  mock begin a dispute
-  (governance-mock.begin-dispute "reporter1-keyset" "" 0)
+  (governance-mock.begin-dispute "reporter-1" "" 0)
   (commit-tx)
   (begin-tx)
   (namespace (read-msg "ns"))
@@ -144,7 +143,7 @@
           (expectedBalance (+ (/ (* (h.precision 10) expectedAccumulatedRewardPerShare)
                                 (h.precision 1)) (h.precision 990))))
       (expect "staker token balance should be expectedBalance"
-        expectedBalance (round (free.h.precision (coin.get-balance "reporter2-keyset"))))
+        expectedBalance (round (free.h.precision (f-TRB.get-balance "reporter2-keyset"))))
       (expect "accumulatedRewardPerShare expectedAccumulatedUpdated"
         expectedAccumulatedUpdated (free.tellorflex.accumulated-reward-per-share))
       (expect "totalRewardDebt expectedRewardDebt" expectedRewardDebt
@@ -156,7 +155,7 @@
   )
   )
   ; mock start a dispute and vote
-  (governance-mock.begin-dispute "reporter1-keyset" "" 0)
+  (governance-mock.begin-dispute "reporter-1" "" 0)
   ; vote on dispute id 4, disregard placeholder params
   (governance-mock.vote 4 false false "reporter2-keyset")
   ; advance time five days
@@ -188,7 +187,7 @@
               (/ (- (* expectedAccumulatedUpdated2 10) expectedRewardDebt) 2)))
               (expectedRewardDebt2 (* 10 expectedAccumulatedUpdated2)))
             (expect "staker token balance should be expectedBalance"
-              expectedBalance2 (round (free.h.precision (coin.get-balance "reporter2-keyset"))))
+              expectedBalance2 (round (free.h.precision (f-TRB.get-balance "reporter2-keyset"))))
             (expect "accumulatedRewardPerShare expectedAccumulatedUpdated"
               expectedAccumulatedUpdated2 (free.tellorflex.accumulated-reward-per-share))
             (expect "totalRewardDebt expectedRewardDebt2" expectedRewardDebt2

@@ -2,11 +2,7 @@
 
 (begin-tx)
 (namespace (read-string "ns"))
-(load "../../query-data-storage.pact")
-(load "../../autopay.pact")
-(load "../../governance.pact")
- ; Input governance address in tellorflex
- (tellorflex.init free.governance)
- (governance.register-gov-guard)
- (commit-tx)
-
+(load "../../modules/query-data-storage.pact")
+(load "../../modules/autopay.pact")
+(load "../../modules/governance.pact")
+(commit-tx)

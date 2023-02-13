@@ -1,0 +1,38 @@
+(load "../tellorflex-setup.repl")
+
+;  *******************************************************************
+  (print "***************************************************************************************")
+  (print "two accounts stake (one 10 TRB one 20 TRB), does account2 have double reward debt?")
+  (begin-tx)
+  (namespace (read-msg "ns"))
+
+  ; check initial conditions
+  (expect "accumulatedRewardPerShare 0" 0 (tellorflex.accumulated-reward-per-share))
+  (expect "rewardRate 0" 0 (tellorflex.reward-rate))
+  (expect "totalRewardDebt 0" 0 (tellorflex.total-reward-debt))
+  (tellorflex.add-staking-rewards "user-keyset" (h.precision 1000))
+  ; check conditions after adding rewards
+  (expect "stakingRewardsBalance 1000" (h.precision 1000) (tellorflex.staking-rewards-balance))
+  (expect "totalRewardDebt 0" 0 (tellorflex.total-reward-debt))
+  (let* ((REWARD_RATE_TARGET (fold (*) 60 [60 24 30]))
+        (expectedRewardRate (/ (h.precision 1000) REWARD_RATE_TARGET)))
+        (expect "rewardRate 10" expectedRewardRate (tellorflex.reward-rate))
+  )
+  ; deposit stake
+  (tellorflex.deposit-stake "reporter-1" (describe-keyset "free.reporter-1") (h.precision 10))
+  ; deposit stake
+  (tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (h.precision 20))
+  ; advance time
+  (env-chain-data {'block-time: (h.advanceTime (* 86400 7))})
+  ; deposit 0 stake, update rewards
+  (tellorflex.deposit-stake "reporter-1" (describe-keyset "free.reporter-1") 0)
+  (commit-tx)
+  (begin-tx)
+  (namespace (read-msg "ns"))
+  ; deposit 0 stake, update rewards
+  (tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") 0)
+  (let ((staker1 (tellorflex.get-staker-info "reporter-1"))
+        (staker2 (tellorflex.get-staker-info "reporter2-keyset")))
+      (expect "debt ratio equals 2" 2 (/ (at 'reward-debt staker2) (at 'reward-debt staker1)))
+  )
+  (commit-tx)

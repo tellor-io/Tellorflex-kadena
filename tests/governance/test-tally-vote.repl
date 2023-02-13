@@ -17,7 +17,7 @@
         (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
     (expect-failure "Cannot tally a dispute that does not exist" (governance.tally-votes 1))
 
-    (begin-dispute "reporter1-keyset"
+    (begin-dispute "reporter-1"
         (hash (base64-encode "{SpotPrice: [eth,usd]}"))
         (h.blockTime))
     (commit-tx)
@@ -25,7 +25,7 @@
     (namespace (read-msg "ns"))
     (use governance)
     (use tellorflex)
-    (governance.vote 1 true false "reporter1-keyset")
+    (governance.vote 1 true false "reporter-1")
     (expect-failure "Time for voting has not elapsed" (governance.tally-votes 1))
     ;  advance 2 days
     (env-chain-data {"block-time": (h.advanceTime (* 86400 2))})
@@ -38,7 +38,7 @@
     (expect "Vote result should be PASSED" "PASSED" result))
     (execute-vote 1)
     (expect-failure "Vote has already been executed" (execute-vote 1))
-    (expect "Reporter balance should be 20 short" 980.0 (coin.get-balance "reporter2-keyset"))
+    (expect "Reporter balance should be 20 short" 980.0 (f-TRB.get-balance "reporter2-keyset"))
     (expect "Staked balance should only be 10" (h.precision 10)
     (at "staked-balance" (get-staker-info "reporter2-keyset")))
     (commit-tx)

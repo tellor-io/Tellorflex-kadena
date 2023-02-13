@@ -7,27 +7,27 @@
     (namespace (read-msg "ns"))
     (use governance) (use tellorflex) (use h)
     (deposit-stake
-        "reporter1-keyset"
-        (describe-keyset (+ (read-msg "ns") ".reporter1-keyset"))
+        "reporter-1"
+        (describe-keyset (+ (read-msg "ns") ".reporter-1"))
         (precision 10))
     (expect-failure "Dispute ID must be valid" (execute-vote 1))
     
-    (let ((bal1 (coin.get-balance "reporter2-keyset")))
+    (let ((bal1 (f-TRB.get-balance "reporter2-keyset")))
         (submit-value
             (hash (base64-encode "{SpotPrice: [eth,usd]}"))
             (base64-encode (priceConversion 100.0)) 0
-            (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+            (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
         (begin-dispute "reporter2-keyset"
             (hash (base64-encode "{SpotPrice: [eth,usd]}"))
             (blockTime))
-        (let ((bal2 (coin.get-balance "reporter2-keyset"))
+        (let ((bal2 (f-TRB.get-balance "reporter2-keyset"))
                 (dispute (get-dispute-info 1)))
             (bind dispute 
                 { "query-id" := query-id, "timestamp" := time, "value" := val, "disputed-reporter" := reporter}
                 (expect "queryID should be correct" (hash (base64-encode "{SpotPrice: [eth,usd]}")) query-id)
                 (expect "timestamp should be correct" (blockTime) time)
                 (expect "value should be correct"  (base64-encode (priceConversion 100.0)) val)
-                (expect "disputedreporter should be correct" "reporter1-keyset" reporter)
+                (expect "disputedreporter should be correct" "reporter-1" reporter)
                 (expect "dispute fee paid should be correct" 0.0 (- (- bal1 bal2) 1))
                 (expect "number of vote rounds should be correct" [1] (get-vote-rounds (hash [query-id time])))
             )
@@ -77,7 +77,7 @@
         (hash (base64-encode "{SpotPrice: [eth,usd]}"))
         (base64-encode (priceConversion 100.0)) 0
         (base64-encode "{SpotPrice: [eth,usd]}")  "reporter3-keyset")
-    (begin-dispute "reporter1-keyset"
+    (begin-dispute "reporter-1"
         (hash (base64-encode "{SpotPrice: [eth,usd]}"))
         (blockTime))
     (commit-tx)
@@ -97,7 +97,7 @@
     (env-chain-data {"block-time": (advanceTime (* 2 86400))})
     (tally-votes 3)
     (expect-failure "1 day has to pass after tally to allow for disputes" (execute-vote 3))
-    (coin.get-balance "governance")
+    (f-TRB.get-balance "governance")
     ;  advance a day
     (env-chain-data {"block-time": (advanceTime 86400)})
     (execute-vote 3)

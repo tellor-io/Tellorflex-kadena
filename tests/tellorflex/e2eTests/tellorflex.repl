@@ -5,8 +5,10 @@
 (env-chain-data {})
 (print "Realistic test with multiple stakers")
 (env-data
-  { "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" }
-  ,"reporter1": { "keys": [ ], "pred": "keys-all" }
+  { "ns": "free"
+  , "admin-keyset": { "keys": [ "admin-public-key" ]}
+  , "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" }
+  , "reporter1": { "keys": [ ], "pred": "keys-all" }
   , "reporter2": { "keys": [ ], "pred": "keys-all" }
   , "reporter3": { "keys": [], "pred": "keys-all" }
   , "reporter4": { "keys": [], "pred": "keys-all" }
@@ -28,28 +30,29 @@
   , "reporter20": { "keys": [], "pred": "keys-all" }
   })
 (env-sigs [
+  {"key": "admin-public-key", "caps": []},
   {"key": "user-public-key", "caps": []},
-  {"key": "user-keyset", "caps": [(coin.TRANSFER "user-keyset" "tellorflex" 1000.0)]}
-  ,{"key": "reporter1", "caps": [(coin.TRANSFER "reporter1" "tellorflex" 100.0)]}
-  ,{"key": "reporter2", "caps": [(coin.TRANSFER "reporter2" "tellorflex" 100.0)]}
-  ,{"key": "reporter3", "caps": [(coin.TRANSFER "reporter3" "tellorflex" 100.0)]}
-  ,{"key": "reporter4", "caps": [(coin.TRANSFER "reporter4" "tellorflex" 100.0)]}
-  ,{"key": "reporter5", "caps": [(coin.TRANSFER "reporter5" "tellorflex" 100.0)]}
-  ,{"key": "reporter6", "caps": [(coin.TRANSFER "reporter6" "tellorflex" 100.0)]}
-  ,{"key": "reporter7", "caps": [(coin.TRANSFER "reporter7" "tellorflex" 100.0)]}
-  ,{"key": "reporter8", "caps": [(coin.TRANSFER "reporter8" "tellorflex" 100.0)]}
-  ,{"key": "reporter9", "caps": [(coin.TRANSFER "reporter9" "tellorflex" 100.0)]}
-  ,{"key": "reporter10", "caps": [(coin.TRANSFER "reporter10" "tellorflex" 100.0)]}
-  ,{"key": "reporter11", "caps": [(coin.TRANSFER "reporter11" "tellorflex" 100.0)]}
-  ,{"key": "reporter12", "caps": [(coin.TRANSFER "reporter12" "tellorflex" 100.0)]}
-  ,{"key": "reporter13", "caps": [(coin.TRANSFER "reporter13" "tellorflex" 100.0)]}
-  ,{"key": "reporter14", "caps": [(coin.TRANSFER "reporter14" "tellorflex" 100.0)]}
-  ,{"key": "reporter15", "caps": [(coin.TRANSFER "reporter15" "tellorflex" 100.0)]}
-  ,{"key": "reporter16", "caps": [(coin.TRANSFER "reporter16" "tellorflex" 100.0)]}
-  ,{"key": "reporter17", "caps": [(coin.TRANSFER "reporter17" "tellorflex" 100.0)]}
-  ,{"key": "reporter18", "caps": [(coin.TRANSFER "reporter18" "tellorflex" 100.0)]}
-  ,{"key": "reporter19", "caps": [(coin.TRANSFER "reporter19" "tellorflex" 100.0)]}
-  ,{"key": "reporter20", "caps": [(coin.TRANSFER "reporter20" "tellorflex" 100.0)]}
+  {"key": "user-keyset", "caps": [(free.f-TRB.TRANSFER "user-keyset" "tellorflex" 1000.0)]}
+  ,{"key": "reporter1", "caps": [(free.f-TRB.TRANSFER "reporter1" "tellorflex" 100.0)]}
+  ,{"key": "reporter2", "caps": [(free.f-TRB.TRANSFER "reporter2" "tellorflex" 100.0)]}
+  ,{"key": "reporter3", "caps": [(free.f-TRB.TRANSFER "reporter3" "tellorflex" 100.0)]}
+  ,{"key": "reporter4", "caps": [(free.f-TRB.TRANSFER "reporter4" "tellorflex" 100.0)]}
+  ,{"key": "reporter5", "caps": [(free.f-TRB.TRANSFER "reporter5" "tellorflex" 100.0)]}
+  ,{"key": "reporter6", "caps": [(free.f-TRB.TRANSFER "reporter6" "tellorflex" 100.0)]}
+  ,{"key": "reporter7", "caps": [(free.f-TRB.TRANSFER "reporter7" "tellorflex" 100.0)]}
+  ,{"key": "reporter8", "caps": [(free.f-TRB.TRANSFER "reporter8" "tellorflex" 100.0)]}
+  ,{"key": "reporter9", "caps": [(free.f-TRB.TRANSFER "reporter9" "tellorflex" 100.0)]}
+  ,{"key": "reporter10", "caps": [(free.f-TRB.TRANSFER "reporter10" "tellorflex" 100.0)]}
+  ,{"key": "reporter11", "caps": [(free.f-TRB.TRANSFER "reporter11" "tellorflex" 100.0)]}
+  ,{"key": "reporter12", "caps": [(free.f-TRB.TRANSFER "reporter12" "tellorflex" 100.0)]}
+  ,{"key": "reporter13", "caps": [(free.f-TRB.TRANSFER "reporter13" "tellorflex" 100.0)]}
+  ,{"key": "reporter14", "caps": [(free.f-TRB.TRANSFER "reporter14" "tellorflex" 100.0)]}
+  ,{"key": "reporter15", "caps": [(free.f-TRB.TRANSFER "reporter15" "tellorflex" 100.0)]}
+  ,{"key": "reporter16", "caps": [(free.f-TRB.TRANSFER "reporter16" "tellorflex" 100.0)]}
+  ,{"key": "reporter17", "caps": [(free.f-TRB.TRANSFER "reporter17" "tellorflex" 100.0)]}
+  ,{"key": "reporter18", "caps": [(free.f-TRB.TRANSFER "reporter18" "tellorflex" 100.0)]}
+  ,{"key": "reporter19", "caps": [(free.f-TRB.TRANSFER "reporter19" "tellorflex" 100.0)]}
+  ,{"key": "reporter20", "caps": [(free.f-TRB.TRANSFER "reporter20" "tellorflex" 100.0)]}
   ])
 (free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1000))
 (let ((func (lambda (a b)
@@ -58,9 +61,8 @@
   (define-keyset (+ "free.reporter" (int-to-str 10 b)) (read-keyset (+ "reporter" (int-to-str 10 b))))
   (commit-tx)
   (begin-tx)
-  (coin.create-account (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))))
-  (test-capability (coin.COINBASE))
-  (coin.coinbase (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 1000.0)
+  (free.f-TRB.create-account (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))))
+  (free.f-TRB.mint (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 1000.0)
   (commit-tx)
   (begin-tx)
   (free.tellorflex.deposit-stake (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) (* 100 (^ 10 12)))
@@ -74,8 +76,7 @@
 (let ((func (lambda (a b)
   (free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1))
   (begin-tx)
-  (test-capability (coin.COINBASE))
-  (coin.coinbase (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 100.0)
+  (free.f-TRB.mint (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 100.0)
   (commit-tx)
   (begin-tx)
   (free.tellorflex.deposit-stake (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) (* 100 (^ 10 12)))
@@ -89,8 +90,7 @@
 (let ((func (lambda (a b)
   (free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1))
   (begin-tx)
-  (test-capability (coin.COINBASE))
-  (coin.coinbase (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 100.0)
+  (free.f-TRB.mint (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 100.0)
   (commit-tx)
   (begin-tx)
   (free.tellorflex.deposit-stake (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) (* 100 (^ 10 12)))

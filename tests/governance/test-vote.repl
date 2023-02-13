@@ -14,30 +14,30 @@
         (hash (base64-encode "{SpotPrice: [eth,usd]}"))
         (base64-encode (h.priceConversion 100.0)) 0
         (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
-    (begin-dispute "reporter1-keyset"
+    (begin-dispute "reporter-1"
         (hash (base64-encode "{SpotPrice: [eth,usd]}"))
         (h.blockTime))
     (expect-failure "Can't vote on dispute that doesn't exist"
-    (vote 2 true false "reporter1-keyset"))
+    (vote 2 true false "reporter-1"))
     (commit-tx)
     (begin-tx)
     (namespace (read-msg "ns"))
     (use governance) (use tellorflex)
-    (vote 1 true false "reporter1-keyset")
+    (vote 1 true false "reporter-1")
     (vote 1 false false "reporter2-keyset")
-    (expect-failure "Voter has already voted" (vote 1 true false "reporter1-keyset"))
+    (expect-failure "Voter has already voted" (vote 1 true false "reporter-1"))
     ;  advance 2 days
     (env-chain-data {"block-time": (h.advanceTime (* 86400 2))})
     (tally-votes 1)
-    (expect-failure "Vote has already been tallied" (vote 1 true false "reporter1-keyset"))
+    (expect-failure "Vote has already been tallied" (vote 1 true false "reporter-1"))
     (bind (get-vote-info 1) 
     { "token-holders" := holders, "users" := users, "reporters" := reporters
     , "team-multisig" := multisig}
     
     (expect "Tokenholders doesSupport tally should be correct" 
-    (h.precision (coin.get-balance "reporter1-keyset")) (/ (at "does-support" holders) 1.0))
+    (h.precision (f-TRB.get-balance "reporter-1")) (/ (at "does-support" holders) 1.0))
     (expect "Tokenholders against tally should be correct" 
-    (h.precision (coin.get-balance "reporter2-keyset")) (/ (at "against" holders) 1.0))
+    (h.precision (f-TRB.get-balance "reporter2-keyset")) (/ (at "against" holders) 1.0))
     (expect "Tokenholders invalid tally should be correct" 0 (at "invalid-query" holders))
     (expect "users support tally should be correct" 0 (at "does-support" users))
     (expect "users against tally should be correct" 0 (at "against" users))
@@ -48,9 +48,9 @@
     (expect "multisig support tally should be correct" 0 (at "does-support" multisig))
     (expect "multisig against tally should be correct" 0 (at "against" multisig))
     (expect "multisig invalid tally should be correct" 0 (at "invalid-query" multisig)) )
-    (expect "Voter 1 voted status should be correct" true (did-vote 1 "reporter1-keyset"))
+    (expect "Voter 1 voted status should be correct" true (did-vote 1 "reporter-1"))
     (expect "Voter 2 voted status should be correct" true (did-vote 1 "reporter2-keyset"))
     (expect "Voter 3 voted status should be correct" false (did-vote 1 "reporter3-keyset"))
-    (expect "Vote tally by address should be correct" 1 (get-vote-tally-by-address "reporter1-keyset"))
+    (expect "Vote tally by address should be correct" 1 (get-vote-tally-by-address "reporter-1"))
     (expect "Vote tally by address should be correct" 1 (get-vote-tally-by-address "reporter2-keyset"))
     (commit-tx)
