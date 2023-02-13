@@ -6,6 +6,7 @@ codeFile: "../modules/tellorflex.pact"
 data:
   ns: n_61b7d03ff34ca7e599e3551df8dcd4a3c1bf7524
   upgrade: false
+  token-price: 15.97
   admin-keyset:
     keys:
       - "4dc745adc8856ff65bfd350c23617c65c4fa0a8e90e3ecfa840fedb5b3f3d387"
