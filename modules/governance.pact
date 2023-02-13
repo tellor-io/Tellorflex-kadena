@@ -2,22 +2,12 @@
 ; read namespace from deploy msg
 (namespace (read-msg "ns"))
 
-(if (read-msg "upgrade")
- "Upgrading contract"
-
- [
-   (enforce-keyset (read-keyset "tellor-admin-keyset"))
-   (define-keyset (+ (read-msg "ns") ".tellor-admin-keyset") (read-keyset "tellor-admin-keyset"))
- ]
-)
-
-
-(module governance GOV
+(module governance TELLOR
   (implements i-governance)
 ; ***************************CAPABILITIES**************************************
-  (defcap GOV:bool ()
+  (defcap TELLOR:bool ()
     (enforce-guard 
-      (keyset-ref-guard (+ (read-msg "ns") ".tellor-admin-keyset")))
+      (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
   )
   (defcap PRIVATE:bool () 
     true
@@ -114,13 +104,13 @@
       , "gov-account-name": gov-account-name
       , "vote-count": 0 })
 
-    (coin.create-account gov-account-name (create-gov-guard))
+    (f-TRB.create-account gov-account-name (create-gov-guard))
     "Global variables set!"
   )
 
   (defun register-gov-guard:string ()
     @doc "Registers the gov guard with the oracle"
-      (with-capability (GOV)
+      (with-capability (TELLOR)
         (tellorflex.init-gov-guard (create-gov-guard))
       )
     "Gov guard registered"
@@ -159,7 +149,7 @@
                             (if (> calc-fee stake-amount) 
                                 stake-amount calc-fee )) )
                     ;  transfer fee to gov account
-                    (coin.transfer account (gov-account) (float fee))
+                    (f-TRB.transfer account (gov-account) (float fee))
                     ;  insert dispute info into dispute-info table
                     (insert dispute-info (str dispute-id)
                       { "query-id": query-id
@@ -189,7 +179,7 @@
                   (enforce (< (- block-time prev-tally-date) ONE_DAY)
                     "New dispute round must be started within a day")
                   ;  transfer fee to gov account
-                  (coin.transfer account (gov-account) (float fee))
+                  (f-TRB.transfer account (gov-account) (float fee))
                   ;  insert vote info into vote-info table
                   (insert-vote-info (str dispute-id) 
                     hash vote-round block-time fee account)
@@ -353,7 +343,7 @@
       , "token-holders" := token-holders, "reporters" := reporters
       , "users" := users, "team-multisig" := team-multisig }
 
-      (bind (coin.details voter-account) { "guard" := g, "balance" := bal } 
+      (bind (f-TRB.details voter-account) { "guard" := g, "balance" := bal } 
         (enforce-guard g)
 
       (let ((vote-count (at "vote-count" (read global "global-vars"))))
@@ -369,8 +359,8 @@
               (reports-submitted (try 0
                 (tellorflex.get-reports-submitted-by-address voter-account)))
               (voter-balance
-                (if (= {} voter-stake-info) (round (* bal (^ 10 12)))
-                  (fold (+) (round (* bal (^ 10 12))) 
+                (if (= {} voter-stake-info) (round (* bal (^ 10 18)))
+                  (fold (+) (round (* bal (^ 10 18))) 
                   [(at "staked-balance" voter-stake-info)
                     (at "locked-balance" voter-stake-info)]))) )
         (with-capability (PRIVATE)
@@ -462,8 +452,8 @@
   (defun transfer-from-gov (account:string amount:decimal)
     (require-capability (PRIVATE))
     (install-capability
-      (coin.TRANSFER (gov-account) account amount))
-      (coin.transfer (gov-account) account amount)
+      (f-TRB.TRANSFER (gov-account) account amount))
+      (f-TRB.transfer (gov-account) account amount)
   )
 
   (defun vote-passed (hash:string idx:integer)
@@ -509,7 +499,7 @@
 
   (defun calculate-vote-to-scale (votes vote-sum)
     (require-capability (PRIVATE))
-    ( / (* votes (^ 10 12)) vote-sum)
+    ( / (* votes (^ 10 18)) vote-sum)
   )
 
   (defun insert-vote-info
@@ -600,7 +590,7 @@
 ; ***************************HELPERS*******************************************
   (defun str (num:integer) (int-to-str 10 num) )
 
-  (defun float:decimal (num:integer) (/ (/ num 1.0) (^ 10 12)) )
+  (defun float:decimal (num:integer) (/ (/ num 1.0) (^ 10 18)) )
 
   (defun block-time ()
     (str-to-int 10
@@ -619,6 +609,7 @@
       (create-table dispute-ids-by-reporter)
       (create-table vote-tally-by-address)
       (constructor 
-        "tellor-admin-keyset" 
-        (read-string "gov-account"))
+        "admin-keyset"
+        "governance")
+      (tellorflex.init governance)
     ])

@@ -1,9 +1,9 @@
 (namespace (read-msg "ns"))
 
-(module autopay TELLOR-ADMIN
+(module autopay TELLOR
 ; ***************************CAPABILITIES**************************************
-  (defcap TELLOR-ADMIN ()
-    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".tellor-admin-keyset")))
+  (defcap TELLOR ()
+    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
   )
   (defcap PRIVATE ()
     true
@@ -25,7 +25,7 @@
     (create-user-guard (private-user-cap))
   )
   (defconst PRECISION:integer 
-    (^ 10 12)
+    (^ 10 18)
   )
 ; ***************************TABLE-SCHEMA**************************************
   (defschema global-schema
@@ -59,7 +59,7 @@
       { "autopay-account": autopay-account
       , "fee": fee
       , "query-ids-with-funding": [] })
-      (coin.create-account autopay-account AUTOPAY_GUARD)
+      (f-TRB.create-account autopay-account AUTOPAY_GUARD)
   )
   (defun claim-one-time-tip
     (claimant:string query-id:string timestamps:[integer])
@@ -80,9 +80,9 @@
                   (fee-total (/ (* reward fee) 1000))
                   (pay-amount (- reward fee-total)))
              
-              (install-capability (coin.TRANSFER "autopay" claimant (to-decimal pay-amount)))
-              (coin.transfer "autopay" claimant (to-decimal pay-amount))
-              (install-capability (coin.TRANSFER "autopay" "tellorflex" (to-decimal fee-total)))
+              (install-capability (f-TRB.TRANSFER "autopay" claimant (to-decimal pay-amount)))
+              (f-TRB.transfer "autopay" claimant (to-decimal pay-amount))
+              (install-capability (f-TRB.TRANSFER "autopay" "tellorflex" (to-decimal fee-total)))
               (tellorflex.add-staking-rewards "autopay" fee-total)
               (if (= (get-current-tip query-id) 0)
                   (if (!= (at "index" (read query-ids-with-funding-index query-id)) 0)
@@ -156,7 +156,7 @@
                 (format "Query id {} has existing tips"[query-id])
             )
         )
-        (coin.transfer tipper "autopay" (to-decimal amount))
+        (f-TRB.transfer tipper "autopay" (to-decimal amount))
         (with-default-read user-tips-total tipper
             { "total": 0 }{ "total" := tips-total }
             (write user-tips-total tipper
@@ -334,8 +334,6 @@
       (create-table tips)
       (create-table query-ids-with-funding-index)
       (create-table user-tips-total)
-      (constructor 
-        (read-string "autopay-account-name") 
-        (read-integer "autopay-fee"))
+      (constructor "autopay" 10)
     ]
 )
