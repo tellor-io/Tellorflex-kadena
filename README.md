@@ -78,7 +78,7 @@ example:
 * [autopay](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_61b7d03ff34ca7e599e3551df8dcd4a3c1bf7524.autopay&chain=1)
 * [governance](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_61b7d03ff34ca7e599e3551df8dcd4a3c1bf7524.governance&chain=1)
 * [i-governance](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_61b7d03ff34ca7e599e3551df8dcd4a3c1bf7524.i-governance&chain=1)
-* * [f-TRB](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_61b7d03ff34ca7e599e3551df8dcd4a3c1bf7524.f-TRB&chain=1)
+* [f-TRB](https://balance.chainweb.com/modules.html?server=api.testnet.chainweb.com&module=n_61b7d03ff34ca7e599e3551df8dcd4a3c1bf7524.f-TRB&chain=1)
 
 ## Maintainers <a name="maintainers"> </a>
 This repository is maintained by the [Tellor team](https://github.com/orgs/tellor-io/people)
