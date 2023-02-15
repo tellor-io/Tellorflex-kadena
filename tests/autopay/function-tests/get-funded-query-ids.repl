@@ -94,7 +94,7 @@
 (tellorflex.submit-value
     (hash (base64-encode "{SpotPrice: [eth,usd]}"))
     (base64-encode (h.priceConversion 100.0)) 0
-    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
 (tellorflex.submit-value
     (hash (base64-encode "{SpotPrice: [btc,usd]}"))
     (base64-encode (h.priceConversion 100.0)) 0
@@ -108,7 +108,7 @@
     (base64-encode (h.priceConversion 100.0)) 0
     (base64-encode "{SpotPrice: [kda,usd]}")  "reporter4-keyset")
 (env-chain-data {"block-time": (h.advanceTime (* 3601 12))})
-(autopay.claim-one-time-tip "reporter1-keyset" 
+(autopay.claim-one-time-tip "reporter-1" 
         (hash (base64-encode "{SpotPrice: [eth,usd]}")) [(- (h.blockTime) (* 3601 12))])
 (let ((funded-query-ids (autopay.get-funded-query-ids))
       (index1 (autopay.get-query-ids-with-funding-index (hash (base64-encode "{SpotPrice: [eth,usd]}"))))

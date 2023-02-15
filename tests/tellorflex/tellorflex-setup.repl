@@ -1,16 +1,73 @@
 (load "../env-setup.repl")
 
-(begin-tx "Deploy Modules and set governance")
+(begin-tx "set governance for tellorflex test")
 (namespace (read-msg "ns"))
-(load "../../testing/governance-mock.pact")
 
-(governance-mock.constructor free.tellorflex)
+;  mock governance for testing
+(module governance-mock TELLOR
+  (implements i-governance)
+
+  (defcap PRIVATE () true )
+
+  (defun private:bool () (require-capability (PRIVATE)) )
+
+  (defcap TELLOR ()
+    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
+  )
+
+  (defun register-gov-guard:string ()
+      (with-capability (TELLOR)
+        (tellorflex.init-gov-guard (create-user-guard (private)))
+      )
+  )
+
+  (defschema global-schema
+    vote-count:integer)
+
+  (defschema vote-tally-by-address
+    vote-tally-by-address:integer)
+
+  (defschema vote-schema
+    voters:[string])
+
+  (deftable vote-table:{vote-schema})
+  (deftable vote-tally:{vote-tally-by-address})
+  (deftable global:{global-schema})
+
+  (defun constructor ()
+    (insert global 'global { 'vote-count: 0})
+  )
+  (defun begin-dispute:string (account:string query-id:string timestamp:integer)
+    (with-read global 'global { 'vote-count := vote-count}
+    (update global 'global { 'vote-count: (+ 1 vote-count)}))
+  )
+  (defun vote (dispute-id:integer supports:bool invalid-query:bool voter-account:string)
+    (let ((vote-count (at "vote-count" (read global "global"))))
+      (enforce (and (<= dispute-id vote-count) (> dispute-id 0)) "Vote doesn't exist"))
+    (with-default-read vote-table (int-to-str 10 dispute-id)
+      { 'voters : [] }{ 'voters := voters }
+    (enforce (not (contains voter-account voters)) "Voter has already voted")
+    (with-default-read vote-tally voter-account
+      { 'vote-tally-by-address: 0 }{ 'vote-tally-by-address := vote-tally-by-address }
+      (write vote-tally voter-account { 'vote-tally-by-address: (+ vote-tally-by-address 1)}))
+
+      (write vote-table (int-to-str 10 dispute-id) { 'voters: (+ voters [voter-account])}))
+    )
+  (defun get-vote-tally-by-address:integer (voter:string)
+    (try 0 (at 'vote-tally-by-address (read vote-tally voter))))
+  (defun get-vote-count:integer ()
+    (at "vote-count" (read global "global")))
+)
+
+(create-table governance-mock.global)
+(create-table governance-mock.vote-table)
+(create-table governance-mock.vote-tally)
+
+(governance-mock.constructor)
 ; Check governance address not initialized in tellorflex
-(expect-failure "row not found" (free.tellorflex.get-governance-module))
+(expect-failure "row not found" (tellorflex.get-governance-module))
 ; Input governance address in tellorflex
-(tellorflex.init free.governance-mock)
-; Additional step that stores governance guard in tellorflex (Owner only)
-(governance-mock.call-tellorflex)
+(tellorflex.init governance-mock)
 ; Expect failure when trying to input governance address again
-(expect-failure "row found for key" (free.tellorflex.init "governance place holder"))
+(expect-failure "row found for key" (tellorflex.init "governance place holder"))
 (commit-tx)

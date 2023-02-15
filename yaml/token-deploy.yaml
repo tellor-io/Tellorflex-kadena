@@ -1,0 +1,35 @@
+networkId: "testnet04"
+type: "exec"
+
+codeFile: "../modules/f-TRB.pact"
+
+data:
+  ns: n_61b7d03ff34ca7e599e3551df8dcd4a3c1bf7524
+  upgrade: false
+  admin-keyset:
+    keys:
+      - "4dc745adc8856ff65bfd350c23617c65c4fa0a8e90e3ecfa840fedb5b3f3d387"
+      - "b0ad5e4f5b1f931d390df08dc4782d19b7001cab647a5e3d41c15ef89da470bb"
+      - "0249fc46ab7b0c3d21f1d0dbc0f05fb758285933188143e846027910a519d36b"
+
+    pred: "keys-all"
+
+  reporter-1:
+    keys:
+      - "023adcbb1794d7da2393b09da3418ebb4de7bc310900e76761f030ee760aad35"
+    pred: "keys-all"
+
+
+# gas account is signer
+signers:
+  - public: "4dc745adc8856ff65bfd350c23617c65c4fa0a8e90e3ecfa840fedb5b3f3d387"
+  - public: "b0ad5e4f5b1f931d390df08dc4782d19b7001cab647a5e3d41c15ef89da470bb"
+  - public: "0249fc46ab7b0c3d21f1d0dbc0f05fb758285933188143e846027910a519d36b"
+
+publicMeta:
+  chainId: "1"
+  sender: "admins-keyset"
+
+  gasLimit: 100000
+  gasPrice: 1.0e-7
+  ttl: 100000

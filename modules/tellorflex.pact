@@ -4,8 +4,8 @@
     "Upgrading contract"
 
     [
-      (enforce-keyset (read-keyset "tellor-admin-keyset"))
-      (define-keyset (+ (read-msg "ns") ".tellor-admin-keyset") (read-keyset "tellor-admin-keyset"))
+      (enforce-keyset (read-keyset "admin-keyset"))
+      (define-keyset (+ (read-msg "ns") ".admin-keyset") (read-keyset "admin-keyset"))
     ]
   )
 
@@ -20,14 +20,13 @@
     \  > (free.tellorflex.retrieve-value ...)"
 
   @model
-    [ (defproperty owner-authorized (authorized-by (+ (read-msg "ns")".tellor-admin-keyset")))
+    [ (defproperty owner-authorized (authorized-by (+ (read-msg "ns")".admin-keyset")))
     ]
-    (implements i-flex)
 
 ; ***************************CAPABILITIES**************************************
   (defcap TELLOR ()
     @doc "Enforce only owner."
-    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".tellor-admin-keyset")))
+    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
   )
   (defcap PRIVATE () true )
   (defcap STAKER (account-name:string)
@@ -78,8 +77,8 @@
       @event true
   )
 ; ***************************CONSTANTS*****************************************
-  (defconst TIME_BASED_REWARD (* 5 (^ 10 11)))
-  (defconst PRECISION (^ 10 12))
+  (defconst TIME_BASED_REWARD (* 5 (^ 10 17)))
+  (defconst PRECISION (^ 10 18))
   (defconst SEVEN_DAYS 604800)
   (defconst THIRTY_DAYS 2592000)
 ; ***************************TABLE-SCHEMA**************************************
@@ -139,6 +138,9 @@
     timestamp-before:integer
     reports:[object{timestamp-dispute-object}]
     disputed:bool)
+  (defschema data-before-value
+    timestamp:integer
+    value:string)
 ; ***************************TABLES********************************************
   (deftable staker-details:{stake-info})
   (deftable reports-submitted-count:{reports-submitted-by-queryid})
@@ -237,21 +239,22 @@
         )
       )
 
-      (coin.create-account tellorflex-account (create-flex-guard))
+      (f-TRB.create-account tellorflex-account (create-flex-guard))
       "Global variables set!"
     )
   )
   (defun init-gov-guard:string (guard:guard)
     ; fails if governance hasn't been initialized
     (get-governance-module)
-    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".tellor-admin-keyset")))
+    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
     (insert gov-guard 'gov-guard {'guard: guard})
     "Gov guard registered"
   )
   (defun init (governance:module{i-governance})
     @doc "Allows the owner to initialize the governance (flex addy needed for governance deployment)"
     (with-capability (TELLOR)
-      (insert governance-table 'governance { 'governance: governance }))
+      (insert governance-table 'governance { 'governance: governance })
+      (governance::register-gov-guard))
   )
   (defun add-staking-rewards (account:string amount:integer)
     @doc "Funds the flex contract with staking rewards (autopay and miniting) anyone can add at will"
@@ -321,8 +324,8 @@
               )
               (let ((updated-withdraw-amount (- (to-withdraw) locked-balance))
                     (updated-amount (- amount locked-balance)))
-                  ;  if the amount is greater than the locked balance, transfer the difference
-                  ;  and update the locked balance to 0
+                  ;  if the amount is greater than the locked balance,
+                  ;  transfer the difference and update the locked balance to 0
                   (transfers-to-flex updated-amount staker)
                   (update staker-details staker
                   { 'locked-balance: 0})
@@ -569,7 +572,7 @@
     @doc "Get last reported value for query id"
     (get-data-before query-id (plus-one (block-time-in-seconds)) )
   )
-  (defun get-data-before:object{i-flex.data-before-value} (query-id:string timestamp:integer)
+  (defun get-data-before:object{data-before-value} (query-id:string timestamp:integer)
     (with-capability (PRIVATE)
       (let* ((reports 
             (try [] (at "timestamps" (read timestamps query-id))))
@@ -667,7 +670,7 @@
       , 'to-withdraw := to-withdraw
       }
       (-
-        (precision (coin.get-balance (tellorflex-account)))
+        (precision (f-TRB.get-balance (tellorflex-account)))
         (fold (+) to-withdraw [total-stake-amount staking-rewards-balance])
       )  
     )
@@ -683,8 +686,8 @@
     (require-capability (PRIVATE))
     (if (> amount 0)
         (let ((flex (tellorflex-account)))
-          (install-capability (coin.TRANSFER flex to (to-decimal amount)))
-          (coin.transfer flex to (to-decimal amount))
+          (install-capability (f-TRB.TRANSFER flex to (to-decimal amount)))
+          (f-TRB.transfer flex to (to-decimal amount))
         )
         "nothing to transfer"
     )
@@ -692,7 +695,7 @@
   (defun transfers-to-flex (amount:integer from:string)
     (require-capability (PRIVATE))
     (if (> amount 0)
-        (coin.transfer from (tellorflex-account) (to-decimal amount))
+        (f-TRB.transfer from (tellorflex-account) (to-decimal amount))
         "nothing to transfer"
     )
   )
@@ -865,7 +868,7 @@
 
       (let* ((reward (/ (*
               (- block-time time-of-last-new-value) time-based-reward) 300))
-             (contract-balance (coin.get-balance (tellorflex-account)))
+             (contract-balance (f-TRB.get-balance (tellorflex-account)))
              (total-time-based-rewards-balance
               (- (precision contract-balance)
                 (fold (+) total-stake-amount
@@ -1028,11 +1031,11 @@
       (create-table staker-details)
       (create-table timestamps)
       (constructor 
-        (read-string "tellorflex-account")
-        (read-integer "reporting-lock")
-        (read-integer "staking-target-price")
-        (read-integer "staking-token-price")
-        (read-integer "minimum-stake-amount")
-        (read-string "staking-token-query-id"))
+        "tellorflex"
+        43200
+        (* 500 PRECISION)
+        (round (* (read-decimal "token-price") PRECISION))
+        (* 10 PRECISION)
+        (hash (base64-encode "{SpotPrice: [trb,usd]}")))
     ]    
 )

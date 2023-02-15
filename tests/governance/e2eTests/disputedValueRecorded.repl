@@ -1,46 +1,37 @@
-(load "../governance-setup.repl")
+(load "../governance-setup.repl" )
 
-(env-sigs [])
-(env-data {})
-(env-data {
-  "reporter1-keyset": { "keys": [ "reporter1-public-key" ], "pred": "keys-all" },
-  "reporter2-keyset": { "keys": [ "reporter2-public-key" ], "pred": "keys-all" } })
-(env-sigs [
-  {"key": "reporter1-keyset", "caps": [(coin.TRANSFER "reporter1-keyset" "tellorflex" 300.0)]},
-  {"key": "reporter2-keyset", "caps": [(coin.TRANSFER "reporter2-keyset" "tellorflex" 100.0),(coin.TRANSFER "reporter2-keyset" "governance" 100.0)]},
-  {"key": "reporter1-public-key", "caps": []},
-  {"key": "reporter2-public-key", "caps": []}])
+;  *******************************************************************
+  (print "***************************************************************************************")
+  (print "On multiple vote rounds, disputed value gets recorded correctly")
+  (begin-tx)
+  (namespace (read-msg "ns"))
+  (use governance) (use tellorflex) (use h)
 
-(begin-tx "On multiple vote rounds, disputed value gets recorded correctly")
-(print "On multiple vote rounds, disputed value gets recorded correctly")
+  (deposit-stake
+    "reporter-1"
+    (describe-keyset "free.reporter-1")
+    (precision 10))
 
-(free.tellorflex.deposit-stake
-  "reporter1-keyset"
-  (describe-keyset "free.reporter1-keyset")
-  (free.h.precision 10))
+  (submit-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (base64-encode (priceConversion 100.0)) 0
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
 
-(free.tellorflex.submit-value
-  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
-  (base64-encode (free.h.priceConversion 100.0)) 0
-  (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+  (begin-dispute
+    "reporter2-keyset"
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (blockTime))
 
-(free.governance.begin-dispute
-  "reporter2-keyset"
-  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
-  (free.h.blockTime))
+  (expect "Disputed value should be correct" (base64-encode (priceConversion 100.0))
+    (at 'value (get-dispute-info 1)))
+  (env-chain-data {'block-time: (advanceTime (* 86400 2))})
+  (tally-votes 1)
 
-(expect "Disputed value should be correct" (base64-encode (free.h.priceConversion 100.0))
-  (at 'value (free.governance.get-dispute-info 1)))
-(format-time "%s" (at 'block-time (chain-data)))
-(env-chain-data {'block-time: (free.h.advanceTime (* 86400 2))})
+  (begin-dispute
+    "reporter2-keyset"
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    ( - (blockTime) (* 86400 2)))
 
-(free.governance.tally-votes 1)
-(commit-tx)
-(begin-tx)
-(free.governance.begin-dispute
-  "reporter2-keyset"
-  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
-  ( - (free.h.blockTime) (* 86400 2)))
-
-(expect "Disputed value should be correct" (base64-encode (free.h.priceConversion 100.0))
-  (at 'value (free.governance.get-dispute-info 2)))
+  (expect "Disputed value should be correct" (base64-encode (priceConversion 100.0))
+    (at 'value (get-dispute-info 2)))
+  (rollback-tx)

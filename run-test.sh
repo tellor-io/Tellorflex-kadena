@@ -6,9 +6,16 @@ folder=0
 flag=0
 
 if [ $# -eq 0 ]; then
-    echo "Error: Please specify a module (tellorflex, governance, or autopay)"
-    exit 1
+    # echo "Error: Please specify a module (tellorflex, governance, or autopay)"
+    echo "Running all tests ..."
+    for file in $(find tests/ -type f)
+    do
+      pact -r "$file"
+
+    done
+exit 0
 fi
+
 # Iterate over the arguments
 for arg in "$@"
 do

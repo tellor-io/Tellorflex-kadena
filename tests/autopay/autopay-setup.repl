@@ -5,8 +5,8 @@
 (expect "Fee should be 10" 10 (autopay.fee))
 ;  deposit staker for 4 reporters
 (tellorflex.deposit-stake
-    "reporter1-keyset"
-    (describe-keyset "free.reporter1-keyset")
+    "reporter-1"
+    (describe-keyset "free.reporter-1")
     (h.precision 100))
 (tellorflex.deposit-stake
     "reporter2-keyset"

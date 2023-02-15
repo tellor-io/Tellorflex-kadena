@@ -1,0 +1,39 @@
+(load "../tellorflex-setup.repl")
+
+;  *******************************************************************
+  (print "***************************************************************************************")
+  (print "open dispute A when reporter stakes, reporter votes on A and one more B")
+  (begin-tx)
+  (namespace (read-msg "ns"))
+  ; create 2 disputes
+  (governance-mock.begin-dispute "user" "" 0)
+  (governance-mock.begin-dispute "user" "" 0)
+  ; vote on one dispute
+  (governance-mock.vote 1 false false "reporter2-keyset")
+  ; deposit stake
+  (tellorflex.deposit-stake "reporter2-keyset" 
+    (describe-keyset (+ (read-msg "ns") ".reporter2-keyset")) (h.precision 10))
+  (let ((staker (tellorflex.get-staker-info "reporter2-keyset")))
+      (expect "staked balance 10" (h.precision 10) (at 'staked-balance staker))
+      (expect "start vote count 2" 2 (at 'start-vote-count staker))
+      (expect "start vote tally 1" 1 (at 'start-vote-tally staker))
+  )
+  ; start a dispute
+  (governance-mock.begin-dispute "user" "" 0)
+  ; vote
+  (governance-mock.vote 2 false false "reporter2-keyset")
+  (governance-mock.vote 3 false false "reporter2-keyset")
+  ; add staking rewards
+  (tellorflex.add-staking-rewards "user-keyset" (h.precision 1000))
+  ; advance time
+  (env-chain-data {'block-time: (h.advanceTime (* 86400 31))})
+  ; request-withdraw
+  (tellorflex.request-staking-withdraw "reporter2-keyset" (h.precision 10))
+  (commit-tx)
+  (begin-tx)
+  (namespace (read-msg "ns"))
+  ; advance time 7 days
+  (env-chain-data {'block-time: (h.advanceTime (+ 1 (* 86400 7)))})
+  ; withdraw
+  (tellorflex.withdraw-stake "reporter2-keyset")
+  (expect "Token balance should be an extra 1000" 2000.0 (f-TRB.get-balance "reporter2-keyset"))

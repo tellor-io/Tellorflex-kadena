@@ -1,0 +1,88 @@
+(load "../governance-setup.repl")
+
+;  *******************************************************************
+(print "***************************************************************************************")
+(print "Test query id value after a dispute")
+(begin-tx)
+(namespace (read-msg "ns"))
+(use governance) (use tellorflex) (use h)
+  (deposit-stake
+    "reporter-1"
+    (describe-keyset "free.reporter-1")
+    (precision 10))
+
+  (expect "there should be no previous value" {"value": "","timestamp": 0}
+    (get-current-value
+      (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+
+  (submit-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (base64-encode (priceConversion 200.0)) 0
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
+
+  (expect "200.0"
+  { 'value: (base64-encode (priceConversion 200.0))
+  , 'timestamp: (blockTime)}
+    (get-current-value
+      (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+  ; advance time
+  (env-chain-data {'block-time: (advanceTime 43201)})
+
+  (expect-failure "Dispute must be started within reporting lock time"
+    (begin-dispute
+      "reporter2-keyset"
+      (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+      (- (blockTime) 43201)))
+
+  (submit-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (base64-encode (priceConversion 100.0)) 0
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
+
+  (expect "100.0"
+  { 'value: (base64-encode (priceConversion 100.0))
+  , 'timestamp: (blockTime)}
+    (get-current-value
+      (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+
+  (begin-dispute
+    "reporter2-keyset"
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (blockTime))
+  (get-current-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}")))
+  (expect "Current value shouldn't be dispute value"
+    { 'value: (base64-encode (priceConversion 200.0))
+    , 'timestamp: (- (blockTime) 43201)}
+      (get-current-value
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+  (rollback-tx)
+;  *******************************************************************
+  (print "***************************************************************************************")
+  (print "Cannot vote on dispute id 0")
+  (begin-tx)
+  (namespace (read-msg "ns"))
+  (use governance) (use tellorflex) (use h)
+  (expect-failure "row not found: 0"
+    (vote 0 true false "reporter-1"))
+  ; deposit stake in tellorflex
+  (deposit-stake
+    "reporter-1"
+    (describe-keyset "free.reporter-1")
+    (precision 100))
+  ; submit value in tellorflex
+  (submit-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (base64-encode (priceConversion 100.0)) 0
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
+  (begin-dispute
+    "reporter2-keyset"
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (blockTime))
+  (commit-tx)
+  (begin-tx)
+  (namespace (read-msg "ns"))
+  (expect-failure "row not found: 0"
+    (governance.vote 0 true false "reporter2-keyset"))
+  (governance.vote 1 true false "reporter2-keyset")
+  (commit-tx)

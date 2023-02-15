@@ -7,8 +7,8 @@
     (namespace (read-msg "ns"))
     (use governance) (use tellorflex)
     (deposit-stake
-        "reporter1-keyset"
-        (describe-keyset (+ (read-msg "ns") ".reporter1-keyset"))
+        "reporter-1"
+        (describe-keyset (+ (read-msg "ns") ".reporter-1"))
         (h.precision 10))
     (expect-failure "No Value exist" (begin-dispute "reporter2-keyset"
         (hash (base64-encode "{SpotPrice: [eth,usd]}"))
@@ -16,15 +16,15 @@
     (submit-value
         (hash (base64-encode "{SpotPrice: [eth,usd]}"))
         (base64-encode (h.priceConversion 100.0)) 0
-        (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+        (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
     (expect-failure "Insufficient funds" (begin-dispute "zero-bal-keyset"
         (hash (base64-encode "{SpotPrice: [eth,usd]}"))
         (h.blockTime)))
-    (let ((bal1 (coin.get-balance "reporter2-keyset")))
+    (let ((bal1 (f-TRB.get-balance "reporter2-keyset")))
       (begin-dispute "reporter2-keyset"
         (hash (base64-encode "{SpotPrice: [eth,usd]}"))
         (h.blockTime))
-      (let ((bal2 (coin.get-balance "reporter2-keyset"))
+      (let ((bal2 (f-TRB.get-balance "reporter2-keyset"))
             (dispute (get-dispute-info 1))
             (vote (get-vote-info 1)))
         (expect "Vote count should be 1" 1 (get-vote-count))
@@ -36,7 +36,7 @@
             (expect "timestamp should be correct" (h.blockTime) time)
             (expect "value should be correct" 
             (base64-encode (h.priceConversion 100.0)) val)
-            (expect "Disputed reporter should be reporter" "reporter1-keyset" reporter)
+            (expect "Disputed reporter should be reporter" "reporter-1" reporter)
             (expect "number of vote rounds should be correct" [1] 
             (get-vote-rounds (hash [query-id time]))) )
         (expect "initiator should be correct" (at "initiator" vote) "reporter2-keyset")

@@ -6,15 +6,15 @@
   (begin-tx)
   (namespace (read-msg "ns"))
   ;  deposit stake (deposit stake account name, guard, amount)
-  (tellorflex.deposit-stake "reporter1-keyset" 
-    (describe-keyset "free.reporter1-keyset") 
+  (tellorflex.deposit-stake "reporter-1" 
+    (describe-keyset (+ (read-msg "ns") ".reporter-1")) 
     (h.precision 30))
     ;  submit value (queryId, value, nonce, queryData, accountName)
   (tellorflex.submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) 
     (base64-encode "100") 
     0 
-    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
   (expect "Values reported count for query id should be 1" 1 
     (tellorflex.get-new-value-count-by-query-id 
     (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
@@ -35,24 +35,24 @@
   ;  slash-reporter (reporter, recipient)
   ;  Note tokens go to governance account and only governance module is allowed to call this function
   (expect "Slashing reporter should return the stake amount that is transfered to recipient" 
-    (h.precision 10) (tellorflex.slash-reporter "reporter1-keyset" "reporter2-keyset"))
+    (h.precision 10) (tellorflex.slash-reporter "reporter-1" "reporter2-keyset"))
   ;  Advance time 4 hrs
   (env-chain-data {'block-time: (h.advanceTime 14400)})
   ;  needed to reset keys in env due to keyset failure appearing
   ;  trying to submit a value should since 12hrs hasn't passed yet
   (expect-failure "Still in reporter lock" 
     (tellorflex.submit-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) 
-    (base64-encode "100") 0 (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset"))
+    (base64-encode "100") 0 (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1"))
   ;  advance 4 hrs
   (env-chain-data {'block-time: (h.advanceTime 14400)})
   ;  Check staker details
   (expect "Staker should still have money staked" 
-    { "guard": (describe-keyset "free.reporter1-keyset")
+    { "guard": (describe-keyset (+ (read-msg "ns") ".reporter-1"))
     , "is-staked": true, "locked-balance": 0
     , "reporter-last-timestamp": (- (h.blockTime) (* 2 14400))
-    , "reports-submitted": 1, "reward-debt": 0, "staked-balance": (* 20 (^ 10 12)); 20 because of 10 were slashed
+    , "reports-submitted": 1, "reward-debt": 0, "staked-balance": (* 20 (^ 10 18)); 20 because of 10 were slashed
     , "start-date": (- (h.blockTime) (* 2 14400)), "start-vote-count": 0
-    , "start-vote-tally": 0 } (tellorflex.get-staker-info "reporter1-keyset"))
+    , "start-vote-tally": 0 } (tellorflex.get-staker-info "reporter-1"))
   (rollback-tx)
 ;  *******************************************************************
   (print "***************************************************************************************")
@@ -60,21 +60,21 @@
   (begin-tx)
   (namespace (read-msg "ns"))
   ;  Deposit stake amount: 10
-  (tellorflex.deposit-stake "reporter1-keyset" 
-    (describe-keyset "free.reporter1-keyset") (* 10 (^ 10 12)))
+  (tellorflex.deposit-stake "reporter-1" 
+    (describe-keyset (+ (read-msg "ns") ".reporter-1")) (* 10 (^ 10 18)))
   ;  Add staking rewards 150
-  (tellorflex.add-staking-rewards "reporter1-keyset" (h.precision 150))
+  (tellorflex.add-staking-rewards "reporter-1" (h.precision 150))
   (expect "Tellorflex balance should be 160 after staking rewards and reporter's stake deposit" 
-    160.0 (coin.get-balance "tellorflex"))
+    160.0 (f-TRB.get-balance "tellorflex"))
   ;  Check reward balance 
   (expect "Staking reward balance should be only 150 and not include reporter's stake" 
-    (* 150 (^ 10 12)) (tellorflex.staking-rewards-balance))
+    (* 150 (^ 10 18)) (tellorflex.staking-rewards-balance))
   ;  Submit value successfully
   (tellorflex.submit-value 
       (hash (base64-encode "{SpotPrice: [eth,usd]}")) 
-      (base64-encode "100") 0 (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+      (base64-encode "100") 0 (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
   ;  sanity check tellorflex balance
-  (expect "Tellorflex balance should be 160.0" 160.0 (coin.get-balance "tellorflex"))
+  (expect "Tellorflex balance should be 160.0" 160.0 (f-TRB.get-balance "tellorflex"))
   (rollback-tx)
 
 ;  *******************************************************************
@@ -83,15 +83,16 @@
   (begin-tx)
   (namespace (read-msg "ns"))
   ;  mint extra tokens
-  (test-capability (coin.COINBASE))
-  (coin.coinbase "reporter2-keyset" (describe-keyset "free.reporter2-keyset") 10000.0)
+  (f-TRB.mint "reporter2-keyset" 
+    (describe-keyset (+ (read-msg "ns") ".reporter2-keyset")) 10000.0)
   (tellorflex.deposit-stake "reporter2-keyset" 
-    (describe-keyset "free.reporter2-keyset") (h.precision 10000))
+    (describe-keyset (+ (read-msg "ns") ".reporter2-keyset")) (h.precision 10000))
   ;  Try update stake amount shouldn't change since no price change
   (tellorflex.update-stake-amount)
   (bind (at 0 (take -1 (env-events true))) 
     {"name" := event, "params" := stake-amount } 
-    (expect "Event is NewStakeAmount" "free.tellorflex.NewStakeAmount" event)
+    (expect "Event is NewStakeAmount" 
+      (+ (read-msg "ns") ".tellorflex.NewStakeAmount") event)
     (expect "Stake amount should still be 10" [(h.precision 10)] stake-amount))
 
   (expect "Stake amount should be still be 10" (h.precision 10) (tellorflex.stake-amount))
@@ -160,7 +161,8 @@
   (tellorflex.update-stake-amount)
   (bind (at 0 (take -1 (env-events true))) 
     {"name" := event, "params" := stake-amount } 
-    (expect "Event is NewStakeAmount" "free.tellorflex.NewStakeAmount" event)
+    (expect "Event is NewStakeAmount" 
+      (+ (read-msg "ns") ".tellorflex.NewStakeAmount") event)
     (expect "Stake amount should increase when price is very low" [(h.precision 50000)] stake-amount))
   (expect "Stake should increase to 50,000" (h.precision 50000) (tellorflex.stake-amount))
   (rollback-tx)
@@ -170,38 +172,38 @@
   (begin-tx)
   (namespace (read-msg "ns"))
 
-  (tellorflex.deposit-stake "reporter1-keyset" 
-    (describe-keyset "free.reporter1-keyset") (h.precision 10))
-  (tellorflex.deposit-stake "reporter1-keyset" 
-    (describe-keyset "free.reporter1-keyset") (h.precision 10))
-  (tellorflex.deposit-stake "reporter1-keyset" 
-    (describe-keyset "free.reporter1-keyset") (h.precision 10))
+  (tellorflex.deposit-stake "reporter-1" 
+    (describe-keyset (+ (read-msg "ns") ".reporter-1")) (h.precision 10))
+  (tellorflex.deposit-stake "reporter-1" 
+    (describe-keyset (+ (read-msg "ns") ".reporter-1")) (h.precision 10))
+  (tellorflex.deposit-stake "reporter-1" 
+    (describe-keyset (+ (read-msg "ns") ".reporter-1")) (h.precision 10))
   ;  Staker details should checkout 
   (expect "should stil have money staked" 
-    { "guard": (describe-keyset "free.reporter1-keyset")
+    { "guard": (describe-keyset (+ (read-msg "ns") ".reporter-1"))
     , "is-staked": true, "locked-balance": 0
     , "reporter-last-timestamp": 0, "reports-submitted": 0
     , "reward-debt": 0, "staked-balance": (h.precision 30)
     , "start-date": (h.blockTime)
     , "start-vote-count": 0
-    , "start-vote-tally": 0} (tellorflex.get-staker-info "reporter1-keyset"))
+    , "start-vote-tally": 0} (tellorflex.get-staker-info "reporter-1"))
   (rollback-tx)
 ;  *******************************************************************
   (print "***************************************************************************************")
   (print "Bad value placed, withdraw requested, dispute started")
   (begin-tx)
   (namespace (read-msg "ns"))
-  (tellorflex.deposit-stake "reporter1-keyset" 
-    (describe-keyset "free.reporter1-keyset") (h.precision 120))
+  (tellorflex.deposit-stake "reporter-1" 
+    (describe-keyset (+ (read-msg "ns") ".reporter-1")) (h.precision 120))
   (tellorflex.submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) 
     (base64-encode (h.priceConversion 4000.0)) 0 
-    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
-  (tellorflex.request-staking-withdraw "reporter1-keyset" (h.precision 120))
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
+  (tellorflex.request-staking-withdraw "reporter-1" (h.precision 120))
   (test-capability (governance-mock.PRIVATE))
   (tellorflex.remove-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (h.blockTime))
-  (tellorflex.slash-reporter "reporter1-keyset" "reporter2-keyset")
-  (expect-failure "7 days didn't pass" (free.tellorflex.withdraw-stake "reporter1-keyset"))
+  (tellorflex.slash-reporter "reporter-1" "reporter2-keyset")
+  (expect-failure "7 days didn't pass" (free.tellorflex.withdraw-stake "reporter-1"))
   (rollback-tx)
 
 ;  *******************************************************************
@@ -209,20 +211,20 @@
   (print "TBR should not add from requestWithdraw dispute")
   (begin-tx)
   (namespace (read-msg "ns"))
-  (tellorflex.deposit-stake "reporter1-keyset" 
-    (describe-keyset "free.reporter1-keyset") (h.precision 10))
+  (tellorflex.deposit-stake "reporter-1" 
+    (describe-keyset (+ (read-msg "ns") ".reporter-1")) (h.precision 10))
   (tellorflex.deposit-stake "reporter2-keyset" 
-    (describe-keyset "free.reporter2-keyset") (h.precision 10))
+    (describe-keyset (+ (read-msg "ns") ".reporter2-keyset")) (h.precision 10))
   (tellorflex.deposit-stake "reporter3-keyset" 
-    (describe-keyset "free.reporter3-keyset") (h.precision 10))
-  (tellorflex.request-staking-withdraw "reporter1-keyset" (h.precision 10))
+    (describe-keyset (+ (read-msg "ns") ".reporter3-keyset")) (h.precision 10))
+  (tellorflex.request-staking-withdraw "reporter-1" (h.precision 10))
   (tellorflex.submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
-  (expect "Tellorflex balance should be 30.0" 30.0 (coin.get-balance "tellorflex"))
-  (test-capability (free.governance-mock.PRIVATE))
+  (expect "Tellorflex balance should be 30.0" 30.0 (f-TRB.get-balance "tellorflex"))
+  (test-capability (governance-mock.PRIVATE))
   (tellorflex.remove-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (h.blockTime))
-  (tellorflex.slash-reporter "reporter1-keyset" "reporter2-keyset")
+  (tellorflex.slash-reporter "reporter-1" "reporter2-keyset")
   (commit-tx)
   (begin-tx)
   (namespace (read-msg "ns"))
@@ -231,15 +233,15 @@
   (tellorflex.submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter3-keyset")
-  (expect "Tellorflex balance should be 20" 20.0 (coin.get-balance "tellorflex"))
-  (test-capability (coin.COINBASE))
+  (expect "Tellorflex balance should be 20" 20.0 (f-TRB.get-balance "tellorflex"))
+
   (test-capability (free.tellorflex.PRIVATE))
-  (coin.coinbase "tellorflex" (tellorflex.create-flex-guard) 10.0)
-  (expect "Tellorflex balance should be 30" 30.0 (coin.get-balance "tellorflex"))
+  (f-TRB.mint "tellorflex" (tellorflex.create-flex-guard) 10.0)
+  (expect "Tellorflex balance should be 30" 30.0 (f-TRB.get-balance "tellorflex"))
   ; advance time 1 day
   (env-chain-data {'block-time: (h.advanceTime 86400)})
   (tellorflex.submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter3-keyset")
-  (expect-that "Tellorflex balance should be less than 30.0" ( > 30.0) (coin.get-balance "tellorflex"))
+  (expect-that "Tellorflex balance should be less than 30.0" ( > 30.0) (f-TRB.get-balance "tellorflex"))
   (commit-tx)

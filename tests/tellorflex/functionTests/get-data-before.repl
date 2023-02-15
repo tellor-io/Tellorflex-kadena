@@ -5,8 +5,8 @@
 (print "Function test: get-data-before")
 (namespace (read-msg "ns"))
 (tellorflex.deposit-stake
-    "reporter1-keyset"
-    (describe-keyset "free.reporter1-keyset")
+    "reporter-1"
+    (describe-keyset "free.reporter-1")
     (h.precision 100))
 (tellorflex.deposit-stake
     "reporter2-keyset"
@@ -52,7 +52,7 @@
 (tellorflex.submit-value
     (hash (base64-encode "{SpotPrice: [eth,usd]}"))
     (base64-encode (h.priceConversion 100.0)) 0
-    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter1-keyset")
+    (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
 (expect "right data 1671658004"  1671658004
     (at "timestamp" 
     (tellorflex.get-data-before 

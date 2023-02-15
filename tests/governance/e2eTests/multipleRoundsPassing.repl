@@ -1,100 +1,104 @@
 (load "../governance-setup.repl")
+(namespace (read-msg "ns"))
+(use f-TRB)
 (env-data {
-  "account1": { "keys": [ "account1-public-key" ], "pred": "keys-all" },
-  "account3": { "keys": [ "account3-public-key" ], "pred": "keys-all" },
-  "account4": { "keys": [ "account4-public-key" ], "pred": "keys-all" },
-  "account2": { "keys": [ "account2-public-key" ], "pred": "keys-all" } })
+  "ns": "free",
+  "admin-keyset": { "keys": [ "admin-public-key" ], "pred": "keys-all"},
+  "account1": { "keys": []},
+  "account3": { "keys": [] },
+  "account4": { "keys": [] },
+  "account2": { "keys": [] } })
 (env-sigs [
-  {"key": "account1", "caps": [(coin.TRANSFER "account1" "account2" 100.0),
-                               (coin.TRANSFER "account1" "tellorflex" 10.0)]},
-  {"key": "account2", "caps": [(coin.TRANSFER "account2" "governance" 10.0)]},
-  {"key": "account3", "caps": [(coin.TRANSFER "account3" "governance" 10.0)]},
-  {"key": "account4", "caps": [(coin.TRANSFER "account4" "governance" 10.0)]},
-  {"key": "account1-public-key", "caps": []},
-  {"key": "account3-public-key", "caps": []},
-  {"key": "account4-public-key", "caps": []},
-  {"key": "account2-public-key", "caps": []}])
+  {"key": "account1", "caps": [(TRANSFER "account1" "account2" 100.0), (TRANSFER "account1" "tellorflex" 10.0)]},
+  {"key": "account2", "caps": [(TRANSFER "account2" "governance" 10.0)]},
+  {"key": "account3", "caps": [(TRANSFER "account3" "governance" 10.0)]},
+  {"key": "account4", "caps": [(TRANSFER "account4" "governance" 10.0)]},
+  {"key": "admin-public-key", "caps": []}])
   (begin-tx)
-  (namespace "free")
-  (define-keyset "free.account1" (read-keyset "account1"))
-  (define-keyset "free.account2" (read-keyset "account2"))
-  (define-keyset "free.account3" (read-keyset "account3"))
-  (define-keyset "free.account4" (read-keyset "account4"))
+  (namespace (read-msg "ns"))
+  (use f-TRB)
+  ;  define keysets in namespace
+  (define-keyset (+ (read-msg "ns") ".account1") (read-keyset "account1"))
+  (define-keyset (+ (read-msg "ns") ".account2") (read-keyset "account2"))
+  (define-keyset (+ (read-msg "ns") ".account3") (read-keyset "account3"))
+  (define-keyset (+ (read-msg "ns") ".account4") (read-keyset "account4"))
+  ;  create accounts in f-trb module
+  (create-account "account1" (describe-keyset (+ (read-msg "ns") ".account1")))
+  (create-account "account2" (describe-keyset (+ (read-msg "ns") ".account2")))
+  (create-account "account3" (describe-keyset (+ (read-msg "ns") ".account3")))
+  (create-account "account4" (describe-keyset (+ (read-msg "ns") ".account4")))
+  ;  mint tokens (with admin cap)
+  (mint "account1" (describe-keyset (+ (read-msg "ns") ".account1")) 1000.0)
+  (mint "account3" (describe-keyset (+ (read-msg "ns") ".account3")) 10.0)
+  (mint "account4" (describe-keyset (+ (read-msg "ns") ".account4")) 10.0)
+  (commit-tx)
+;  *******************************************************************
+  (print "***************************************************************************************")
+  (print "Test multiple vote rounds on a dispute, all passing")
+  (begin-tx)
+  (namespace (read-msg "ns"))
+  (use governance) (use tellorflex) (use f-TRB)
+  (transfer "account1" "account2" 100.0)
+  (deposit-stake
+    "account1"
+    (describe-keyset "free.account1")
+    (h.precision 10))
+
+  (submit-value
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (base64-encode (h.priceConversion 100.0)) 0
+    (base64-encode "{SpotPrice: [eth,usd]}")  "account1")
+
+  ; round 1
+  (begin-dispute
+    "account2"
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (h.blockTime))
   (commit-tx)
   (begin-tx)
-  (coin.create-account "account1" (describe-keyset "free.account1"))
-  (coin.create-account "account2" (describe-keyset "free.account2"))
-  (coin.create-account "account3" (describe-keyset "free.account3"))
-  (coin.create-account "account4" (describe-keyset "free.account4"))
+  (namespace (read-msg "ns"))
+  (use governance) (use tellorflex) (use f-TRB)
+  (vote 1 true false "account1")
+  (vote 1 true false "account2")
+  ; advance time
+  (env-chain-data {'block-time: (h.advanceTime (* 86400 2))})
+  (tally-votes 1)
 
-  (test-capability (coin.COINBASE))
-  (coin.coinbase "account1" (describe-keyset "free.account1") 1000.0)
-  (coin.coinbase "account3" (describe-keyset "free.account3") 10.0)
-  (coin.coinbase "account4" (describe-keyset "free.account4") 10.0)
+  (begin-dispute
+    "account3"
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (- (h.blockTime) (* 86400 2)))
+  (vote 2 true false "account1")
+  (vote 2 true false "account2")
+  ; advance time
+  (env-chain-data {'block-time: (h.advanceTime (* 86400 4))})
+  (tally-votes 2)
+  ; round 3
+  (begin-dispute
+    "account4"
+    (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+    (- (h.blockTime) (* 86400 6)))
+  (vote 3 true false "account1")
+  (vote 3 true false "account2")
+  ; advance time
+  (env-chain-data {'block-time: (h.advanceTime (* 86400 6))})
+  (tally-votes 3)
+  ; execute
+  (env-chain-data {'block-time: (free.h.advanceTime (* 86400 3))})
+  (let ((reporter-bal (get-balance "account1"))
+        (disputer1-bal (get-balance "account2"))
+        (disputer2-bal (get-balance "account3"))
+        (disputer3-bal (get-balance "account4"))
+        (balance-gov (get-balance "governance")))
+
+    (expect-failure "Must be the final vote" (execute-vote 1))
+    (expect-failure "Must be the final vote" (execute-vote 2))
+    (execute-vote 3)
+    (expect-failure "Vote has already been executed" (execute-vote 3))
+    (expect "" reporter-bal (get-balance "account1"))
+    (expect "" (+ 11.0 disputer1-bal) (get-balance "account2"))
+    (expect "" (+ 2.0 disputer2-bal) (get-balance "account3"))
+    (expect "" (+ 2.0 disputer2-bal) (get-balance "account4"))
+    (expect "" (- balance-gov 17.0) (get-balance "governance"))
+    (expect "passed" "PASSED" (at 'result (get-vote-info 3))))
   (commit-tx)
-(begin-tx "Test multiple vote rounds on a dispute, all passing")
-(print "Test multiple vote rounds on a dispute, all passing")
-(coin.transfer "account1" "account2" 100.0)
-(free.tellorflex.deposit-stake
-  "account1"
-  (describe-keyset "free.account1")
-  (free.h.precision 10))
-
-(free.tellorflex.submit-value
-  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
-  (base64-encode (free.h.priceConversion 100.0)) 0
-  (base64-encode "{SpotPrice: [eth,usd]}")  "account1")
-(commit-tx)
-; round 1
-(begin-tx)
-(free.governance.begin-dispute
-  "account2"
-  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
-  (free.h.blockTime))
-(commit-tx)
-(begin-tx)
-(free.governance.vote 1 true false "account1")
-(free.governance.vote 1 true false "account2")
-; advance time
-(env-chain-data {'block-time: (free.h.advanceTime (* 86400 2))})
-(free.governance.tally-votes 1)
-(commit-tx)
-; round 2
-(begin-tx)
-(free.governance.begin-dispute
-  "account3"
-  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
-  (- (free.h.blockTime) (* 86400 2)))
-(free.governance.vote 2 true false "account1")
-(free.governance.vote 2 true false "account2")
-; advance time
-(env-chain-data {'block-time: (free.h.advanceTime (* 86400 4))})
-(free.governance.tally-votes 2)
-; round 3
-(free.governance.begin-dispute
-  "account4"
-  (hash (base64-encode "{SpotPrice: [eth,usd]}"))
-  (- (free.h.blockTime) (* 86400 6)))
-(free.governance.vote 3 true false "account1")
-(free.governance.vote 3 true false "account2")
-; advance time
-(env-chain-data {'block-time: (free.h.advanceTime (* 86400 6))})
-(free.governance.tally-votes 3)
-; execute
-(env-chain-data {'block-time: (free.h.advanceTime (* 86400 3))})
-(let ((reporter-bal (coin.get-balance "account1"))
-      (disputer1-bal (coin.get-balance "account2"))
-      (disputer2-bal (coin.get-balance "account3"))
-      (disputer3-bal (coin.get-balance "account4"))
-      (balance-gov (coin.get-balance "governance")))
-
-  (expect-failure "Must be the final vote" (free.governance.execute-vote 1))
-  (expect-failure "Must be the final vote" (free.governance.execute-vote 2))
-  (free.governance.execute-vote 3)
-  (expect-failure "Vote has already been executed" (free.governance.execute-vote 3))
-  (expect "" reporter-bal (coin.get-balance "account1"))
-  (expect "" (+ 11.0 disputer1-bal) (coin.get-balance "account2"))
-  (expect "" (+ 2.0 disputer2-bal) (coin.get-balance "account3"))
-  (expect "" (+ 2.0 disputer2-bal) (coin.get-balance "account4"))
-  (expect "" (- balance-gov 17.0) (coin.get-balance "governance"))
-  (expect "passed" "PASSED" (at 'result (free.governance.get-vote-info 3))))
