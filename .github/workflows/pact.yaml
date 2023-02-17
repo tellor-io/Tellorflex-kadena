@@ -21,7 +21,7 @@ jobs:
       run: |
         curl -o pact.zip -L https://github.com/kadena-io/pact/releases/download/v4.4.1/pact-4.4.1-linux-20.04.zip
         unzip -d pact pact.zip
-        ls -l pact/bin
+        ls -l pact
         chmod +x pact/bin/pact
         export PATH=$PATH:$PWD/pact/bin
 
