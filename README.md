@@ -1,4 +1,4 @@
-![CI](https://github.com/tellor-io/Tellorflex-kadena/actions/workflows/pact.yml/badge.svg)
+![CI](https://github.com/tellor-io/Tellorflex-kadena/actions/workflows/pact.yaml/badge.svg)
 <p align="center">
   <a href='https://www.tellor.io/'>
     <img src= 'https://raw.githubusercontent.com/tellor-io/TellorBrandMaterials/master/Swoosh%20and%20wordmark%20legacy/SwooshWordmarkLegacy.png' width="350" height="250" alt='tellor.io' />
