@@ -1,4 +1,4 @@
-name: Install Pact and test
+name: CI
 
 on: [push]
 
