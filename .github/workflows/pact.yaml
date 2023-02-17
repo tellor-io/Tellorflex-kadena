@@ -20,8 +20,8 @@ jobs:
     - name: Download Pact binary
       run: |
         curl -o pact.zip -L https://github.com/kadena-io/pact/releases/download/v4.4.1/pact-4.4.1-linux-20.04.zip
-        unzip -d pact pact.zip
-        ls -l pact
+        unzip -o pact.zip -d pact
+        mv pact/pact pact/bin/
         chmod +x pact/bin/pact
         export PATH=$PATH:$PWD/pact/bin
 
