@@ -1,4 +1,4 @@
-name: Install Pact and run tests
+name: Install Pact and test
 
 on: [push]
 
@@ -8,16 +8,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Install z3
-      run: sudo apt-get install -y z3
-    - name: Download and extract Pact binary
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y unzip
+        sudo apt-get install -y z3
+
+    - name: Download Pact binary
       run: |
         curl -o pact.zip -L https://github.com/kadena-io/pact/releases/download/v4.4.1/pact-4.4.1-linux-20.04.zip
-        unzip pact.zip
-        chmod +x pact/bin/*
+        unzip -d pact pact.zip
+        chmod +x pact/bin/pact
         export PATH=$PATH:$PWD/pact/bin
-    - name: Verify Pact installation
+
+    - name: Validate installation
       run: pact --version
     - name: Run run-test.sh script
       run: bash run-test.sh
