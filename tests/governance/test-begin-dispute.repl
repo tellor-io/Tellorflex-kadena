@@ -9,7 +9,7 @@
     (deposit-stake
         "reporter-1"
         (describe-keyset (+ (read-msg "ns") ".reporter-1"))
-        (h.precision 1))
+        (h.precision 10))
     (expect-failure "No Value exist" (begin-dispute "reporter2-keyset"
         (hash (base64-encode "{SpotPrice: [eth,usd]}"))
         (h.blockTime)))
