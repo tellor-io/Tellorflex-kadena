@@ -29,4 +29,4 @@ jobs:
     - name: Validate installation
       run: export PATH=$PATH:$PWD/pact/bin && pact --version
     - name: Run run-test.sh script
-      run: export PATH=$PATH:$PWD/pact/bin && bash run-test.sh
+      run: export PATH=$PATH:$PWD/pact/bin && bash -e run-test.sh
