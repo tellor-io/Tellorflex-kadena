@@ -1,6 +1,7 @@
 (namespace (read-msg "ns"))
 
 (module autopay TELLOR
+  (use tellorflex [FLEX_ACCOUNT])
 ; ***************************CAPABILITIES**************************************
   (defcap TELLOR ()
     (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
@@ -18,18 +19,17 @@
     @event true
   )
 ; ***************************CONSTANTS*****************************************
-  (defun private-user-cap:bool ()
-    (require-capability (PRIVATE))
-  )
   (defconst AUTOPAY_GUARD:guard
-    (create-user-guard (private-user-cap))
+    (create-capability-guard (PRIVATE))
   )
   (defconst PRECISION:integer 
     (^ 10 18)
   )
+  (defconst AUTOPAY_ACCOUNT:string
+    (create-principal AUTOPAY_GUARD)
+  )
 ; ***************************TABLE-SCHEMA**************************************
   (defschema global-schema
-    autopay-account:string
     fee:integer
     query-ids-with-funding:[string]
   )
@@ -54,12 +54,11 @@
   (deftable query-ids-with-funding-index:{query-ids-with-funding-index-schema})
   (deftable user-tips-total:{user-tips-total-schema})
 ; ***************************MAIN-FUNCTIONS************************************
-  (defun constructor (autopay-account:string fee:integer)
+  (defun constructor (fee:integer)
       (insert global "global" 
-      { "autopay-account": autopay-account
-      , "fee": fee
+      { "fee": fee
       , "query-ids-with-funding": [] })
-      (f-TRB.create-account autopay-account AUTOPAY_GUARD)
+      (f-TRB.create-account AUTOPAY_ACCOUNT AUTOPAY_GUARD)
   )
   (defun claim-one-time-tip
     (claimant:string query-id:string timestamps:[integer])
@@ -80,10 +79,10 @@
                   (fee-total (/ (* reward fee) 1000))
                   (pay-amount (- reward fee-total)))
              
-              (install-capability (f-TRB.TRANSFER "autopay" claimant (to-decimal pay-amount)))
-              (f-TRB.transfer "autopay" claimant (to-decimal pay-amount))
-              (install-capability (f-TRB.TRANSFER "autopay" "tellorflex" (to-decimal fee-total)))
-              (tellorflex.add-staking-rewards "autopay" fee-total)
+              (install-capability (f-TRB.TRANSFER AUTOPAY_ACCOUNT claimant (to-decimal pay-amount)))
+              (f-TRB.transfer AUTOPAY_ACCOUNT claimant (to-decimal pay-amount))
+              (install-capability (f-TRB.TRANSFER AUTOPAY_ACCOUNT FLEX_ACCOUNT (to-decimal fee-total)))
+              (tellorflex.add-staking-rewards AUTOPAY_ACCOUNT fee-total)
               (if (= (get-current-tip query-id) 0)
                   (if (!= (at "index" (read query-ids-with-funding-index query-id)) 0)
                       (let* ((idx (at "index" (read query-ids-with-funding-index query-id)))
@@ -156,7 +155,7 @@
                 (format "Query id {} has existing tips"[query-id])
             )
         )
-        (f-TRB.transfer tipper "autopay" (to-decimal amount))
+        (f-TRB.transfer tipper AUTOPAY_ACCOUNT (to-decimal amount))
         (with-default-read user-tips-total tipper
             { "total": 0 }{ "total" := tips-total }
             (write user-tips-total tipper
@@ -271,10 +270,6 @@
     )
   )
 ; ***************************GETTERS*******************************************
-  (defun autopay-account:string ()
-    @doc "Autopay account name in token module"
-    (at "autopay-account" (read global "global"))
-  )
   (defun blockTime:integer ()
     @doc "Block time in seconds"
     (str-to-int 10 (format-time "%s" (at 'block-time (chain-data))))
@@ -334,6 +329,6 @@
       (create-table tips)
       (create-table query-ids-with-funding-index)
       (create-table user-tips-total)
-      (constructor "autopay" 10)
+      (constructor 10)
     ]
 )

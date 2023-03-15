@@ -57,7 +57,7 @@
   (env-chain-data {'block-time: (advanceTime (* 86400 3))})
   (let ((voter1-bal (f-TRB.get-balance "reporter-1"))
         (voter2-bal (f-TRB.get-balance "reporter2-keyset"))
-        (balance-gov (f-TRB.get-balance "governance")))
+        (balance-gov (f-TRB.get-balance GOV_ACCOUNT)))
 
     (expect-failure "Must be the final vote" (execute-vote 1))
     (expect-failure "Must be the final vote" (execute-vote 2))
@@ -65,5 +65,5 @@
     (expect-failure "Vote has already been executed" (execute-vote 3))
     (expect "" (+ 17.0 voter1-bal) (f-TRB.get-balance "reporter-1"))
     (expect "" voter2-bal (f-TRB.get-balance "reporter2-keyset"))
-    (expect "" (- balance-gov 17.0) (f-TRB.get-balance "governance"))
+    (expect "" (- balance-gov 17.0) (f-TRB.get-balance GOV_ACCOUNT))
     (expect "Vote failed" "FAILED" (at 'result (get-vote-info 3))))

@@ -6,3 +6,24 @@
 (load "../../modules/autopay.pact")
 (load "../../modules/governance.pact")
 (commit-tx)
+(namespace (read-string "ns"))
+(use governance) (use tellorflex)
+(env-sigs [
+    { "key": "admin-public-key", "caps": []},
+    { "key": "reporter-1", "caps": [
+      (f-TRB.TRANSFER "reporter-1" FLEX_ACCOUNT 300.0),
+      (f-TRB.TRANSFER "reporter-1" GOV_ACCOUNT 100.0) ]},
+    { "key": "reporter2-keyset", "caps": [
+      (f-TRB.TRANSFER "reporter2-keyset" FLEX_ACCOUNT 10000.0), 
+      (f-TRB.TRANSFER "reporter2-keyset" GOV_ACCOUNT 100.0) ]},
+    { "key": "reporter3-keyset", "caps": [
+      (f-TRB.TRANSFER "reporter3-keyset" FLEX_ACCOUNT 300.0) ]},
+    { "key": "reporter4-keyset", "caps": [
+        (f-TRB.TRANSFER "reporter4-keyset" FLEX_ACCOUNT 100.0),
+      (f-TRB.TRANSFER "reporter4-keyset" GOV_ACCOUNT 100.0) ]},
+    { "key": "user-keyset", "caps": [ 
+        (f-TRB.TRANSFER "user-keyset" FLEX_ACCOUNT 100.0),
+      (f-TRB.TRANSFER "user-keyset" GOV_ACCOUNT 100.0) ]},
+    { "key": "reporter1-public-key", "caps": []}, { "key": "reporter2-public-key", "caps": []},
+    { "key": "reporter3-public-key", "caps": []}, { "key": "reporter4-public-key", "caps": []},
+    { "key": "reporter5-public-key", "caps": []}, { "key": "user-public-key", "caps": []} ])

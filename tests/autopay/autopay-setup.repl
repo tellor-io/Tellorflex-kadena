@@ -1,23 +1,40 @@
 (load "../governance/governance-setup.repl")
- 
+(use autopay) (use tellorflex)
+(env-sigs [
+    { "key": "admin-public-key", "caps": []},
+    { "key": "reporter-1", "caps": [
+      (f-TRB.TRANSFER "reporter-1" FLEX_ACCOUNT 300.0),
+      (f-TRB.TRANSFER "reporter-1" AUTOPAY_ACCOUNT 100.0) ]},
+    { "key": "reporter2-keyset", "caps": [
+      (f-TRB.TRANSFER "reporter2-keyset" FLEX_ACCOUNT 10000.0),
+      (f-TRB.TRANSFER "reporter2-keyset" AUTOPAY_ACCOUNT 100.0) ]},
+    { "key": "reporter3-keyset", "caps": [
+      (f-TRB.TRANSFER "reporter3-keyset" FLEX_ACCOUNT 300.0) ]},
+    { "key": "reporter4-keyset", "caps": [
+      (f-TRB.TRANSFER "reporter4-keyset" FLEX_ACCOUNT 100.0) ]},
+    { "key": "user-keyset", "caps": [
+      (f-TRB.TRANSFER "user-keyset" AUTOPAY_ACCOUNT 1000.0) ]},
+    { "key": "reporter1-public-key", "caps": []}, { "key": "reporter2-public-key", "caps": []},
+    { "key": "reporter3-public-key", "caps": []}, { "key": "reporter4-public-key", "caps": []},
+    { "key": "user-public-key", "caps": []} ])
 (begin-tx)
 (namespace (read-msg "ns"))
 (expect "Fee should be 10" 10 (autopay.fee))
 ;  deposit staker for 4 reporters
 (tellorflex.deposit-stake
     "reporter-1"
-    (describe-keyset "free.reporter-1")
+    (read-keyset "reporter-1")
     (h.precision 100))
 (tellorflex.deposit-stake
     "reporter2-keyset"
-    (describe-keyset "free.reporter2-keyset")
+    (read-keyset "reporter2-keyset")
     (h.precision 100))
 (tellorflex.deposit-stake
     "reporter3-keyset"
-    (describe-keyset "free.reporter3-keyset")
+    (read-keyset "reporter3-keyset")
     (h.precision 100))
 (tellorflex.deposit-stake
     "reporter4-keyset"
-    (describe-keyset "free.reporter4-keyset")
+    (read-keyset "reporter4-keyset")
     (h.precision 100))
 (commit-tx)

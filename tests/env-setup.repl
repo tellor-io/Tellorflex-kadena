@@ -26,32 +26,7 @@
     , "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" }
     , "zero-bal-keyset": { "keys": []}})
 (env-sigs [
-    { "key": "admin-public-key", "caps": []},
-    { "key": "reporter-1", "caps": [
-      (f-TRB.TRANSFER "reporter-1" "tellorflex" 300.0), 
-      (f-TRB.TRANSFER "reporter-1" "governance" 100.0), 
-      (f-TRB.TRANSFER "reporter-1" "autopay" 100.0) ]},
-    { "key": "reporter2-keyset", "caps": [
-      (f-TRB.TRANSFER "reporter2-keyset" "tellorflex" 10000.0), 
-      (f-TRB.TRANSFER "reporter2-keyset" "governance" 100.0), 
-      (f-TRB.TRANSFER "reporter2-keyset" "autopay" 100.0) ]},
-    { "key": "reporter3-keyset", "caps": [
-      (f-TRB.TRANSFER "reporter3-keyset" "tellorflex" 300.0), 
-      (f-TRB.TRANSFER "reporter3-keyset" "autopay" 100.0) ]},
-    { "key": "reporter4-keyset", "caps": [
-      (f-TRB.TRANSFER "reporter4-keyset" "tellorflex" 100.0), 
-      (f-TRB.TRANSFER "reporter4-keyset" "governance" 100.0), 
-      (f-TRB.TRANSFER "reporter4-keyset" "autopay" 100.0) ]},
-    { "key": "user-keyset", "caps": [
-      (f-TRB.TRANSFER "user-keyset" "tellorflex" 1000.0), 
-      (f-TRB.TRANSFER "user-keyset" "governance" 100.0),
-      (f-TRB.TRANSFER "user-keyset" "autopay" 1000.0) ]},
-    { "key": "zero-bal-keyset", "caps": [
-      (f-TRB.TRANSFER "zero-bal-keyset" "tellorflex" 1000.0), 
-      (f-TRB.TRANSFER "zero-bal-keyset" "governance" 1000.0) ]},
-    { "key": "reporter1-public-key", "caps": []}, { "key": "reporter2-public-key", "caps": []},
-    { "key": "reporter3-public-key", "caps": []}, { "key": "reporter4-public-key", "caps": []},
-    { "key": "reporter5-public-key", "caps": []}, { "key": "user-public-key", "caps": []} ])
+    { "key": "admin-public-key", "caps": []}])
 
 
 (env-chain-data {'block-time: (time "2022-12-21T21:26:41Z"), 'block-height: 1})
@@ -67,19 +42,19 @@
 (define-keyset (+ (read-msg "ns") ".zero-bal-keyset") (read-keyset "zero-bal-keyset"))
 
 ;  create accounts in coin for reporters to recieve funds
-(create-account "reporter2-keyset" (describe-keyset (+ (read-msg "ns") ".reporter2-keyset")))
-(create-account "reporter3-keyset" (describe-keyset (+ (read-msg "ns") ".reporter3-keyset")))
-(create-account "reporter4-keyset" (describe-keyset (+ (read-msg "ns") ".reporter4-keyset")))
-(create-account "reporter5-keyset" (describe-keyset (+ (read-msg "ns") ".reporter5-keyset")))
-(create-account "user-keyset" (describe-keyset (+ (read-msg "ns") ".user-keyset")))
-(create-account "zero-bal-keyset" (describe-keyset (+ (read-msg "ns") ".zero-bal-keyset")))
+(create-account "reporter2-keyset" (read-keyset "reporter2-keyset"))
+(create-account "reporter3-keyset" (read-keyset "reporter3-keyset"))
+(create-account "reporter4-keyset" (read-keyset "reporter4-keyset"))
+(create-account "reporter5-keyset" (read-keyset "reporter5-keyset"))
+(create-account "user-keyset" (read-keyset "user-keyset"))
+(create-account "zero-bal-keyset" (read-keyset "zero-bal-keyset"))
 
 ;  MINT
-(mint "reporter2-keyset" (describe-keyset (+ (read-msg "ns") ".reporter2-keyset")) 1000.0)
-(mint "reporter3-keyset" (describe-keyset (+ (read-msg "ns") ".reporter3-keyset")) 100.0)
-(mint "reporter4-keyset" (describe-keyset (+ (read-msg "ns") ".reporter4-keyset")) 100.0)
-(mint "reporter5-keyset" (describe-keyset (+ (read-msg "ns") ".reporter5-keyset")) 5000.0)
-(mint "user-keyset" (describe-keyset (+ (read-msg "ns") ".user-keyset")) 1000.0)
+(mint "reporter2-keyset" (read-keyset "reporter2-keyset") 1000.0)
+(mint "reporter3-keyset" (read-keyset "reporter3-keyset") 100.0)
+(mint "reporter4-keyset" (read-keyset "reporter4-keyset") 100.0)
+(mint "reporter5-keyset" (read-keyset "reporter5-keyset") 5000.0)
+(mint "user-keyset" (read-keyset "user-keyset") 1000.0)
 (commit-tx)
 
 (begin-tx)

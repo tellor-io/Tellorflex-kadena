@@ -1,5 +1,23 @@
 (load "../env-setup.repl")
-
+(namespace (read-msg "ns"))
+(use tellorflex)
+(env-sigs [
+  { "key": "admin-public-key", "caps": []},
+  { "key": "reporter-1", "caps": [
+    (f-TRB.TRANSFER "reporter-1" FLEX_ACCOUNT 300.0)]},
+  { "key": "reporter2-keyset", "caps": [
+    (f-TRB.TRANSFER "reporter2-keyset" FLEX_ACCOUNT 10000.0)]},
+  { "key": "reporter3-keyset", "caps": [
+    (f-TRB.TRANSFER "reporter3-keyset" FLEX_ACCOUNT 300.0)]},
+  { "key": "reporter4-keyset", "caps": [
+    (f-TRB.TRANSFER "reporter4-keyset" FLEX_ACCOUNT 100.0)]},
+  { "key": "reporter5-keyset", "caps": [
+    (f-TRB.TRANSFER "reporter5-keyset" FLEX_ACCOUNT 5000.0)]},
+  { "key": "user-keyset", "caps": [
+    (f-TRB.TRANSFER "user-keyset" FLEX_ACCOUNT 1000.0)]},
+  { "key": "reporter1-public-key", "caps": []}, { "key": "reporter2-public-key", "caps": []},
+  { "key": "reporter3-public-key", "caps": []}, { "key": "reporter4-public-key", "caps": []},
+  { "key": "reporter5-public-key", "caps": []}, { "key": "user-public-key", "caps": []} ])
 (begin-tx "set governance for tellorflex test")
 (namespace (read-msg "ns"))
 
@@ -9,16 +27,12 @@
 
   (defcap PRIVATE () true )
 
-  (defun private:bool () (require-capability (PRIVATE)) )
-
   (defcap TELLOR ()
     (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
   )
 
-  (defun register-gov-guard:string ()
-      (with-capability (TELLOR)
-        (tellorflex.init-gov-guard (create-user-guard (private)))
-      )
+  (defun register-gov-guard:guard ()
+      (with-capability (TELLOR) (create-capability-guard (PRIVATE)))
   )
 
   (defschema global-schema

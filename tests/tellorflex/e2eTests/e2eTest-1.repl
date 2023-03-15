@@ -59,13 +59,14 @@
   (print "TBR should not borrow from staking rewards")
   (begin-tx)
   (namespace (read-msg "ns"))
+  (use tellorflex)
   ;  Deposit stake amount: 10
   (tellorflex.deposit-stake "reporter-1" 
     (describe-keyset (+ (read-msg "ns") ".reporter-1")) (* 10 (^ 10 18)))
   ;  Add staking rewards 150
   (tellorflex.add-staking-rewards "reporter-1" (h.precision 150))
   (expect "Tellorflex balance should be 160 after staking rewards and reporter's stake deposit" 
-    160.0 (f-TRB.get-balance "tellorflex"))
+    160.0 (f-TRB.get-balance FLEX_ACCOUNT))
   ;  Check reward balance 
   (expect "Staking reward balance should be only 150 and not include reporter's stake" 
     (* 150 (^ 10 18)) (tellorflex.staking-rewards-balance))
@@ -74,7 +75,7 @@
       (hash (base64-encode "{SpotPrice: [eth,usd]}")) 
       (base64-encode "100") 0 (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
   ;  sanity check tellorflex balance
-  (expect "Tellorflex balance should be 160.0" 160.0 (f-TRB.get-balance "tellorflex"))
+  (expect "Tellorflex balance should be 160.0" 160.0 (f-TRB.get-balance FLEX_ACCOUNT))
   (rollback-tx)
 
 ;  *******************************************************************
@@ -205,43 +206,43 @@
   (tellorflex.slash-reporter "reporter-1" "reporter2-keyset")
   (expect-failure "7 days didn't pass" (free.tellorflex.withdraw-stake "reporter-1"))
   (rollback-tx)
-
 ;  *******************************************************************
   (print "***************************************************************************************")
   (print "TBR should not add from requestWithdraw dispute")
   (begin-tx)
   (namespace (read-msg "ns"))
-  (tellorflex.deposit-stake "reporter-1" 
+  (use tellorflex)
+  (deposit-stake "reporter-1" 
     (describe-keyset (+ (read-msg "ns") ".reporter-1")) (h.precision 10))
-  (tellorflex.deposit-stake "reporter2-keyset" 
+  (deposit-stake "reporter2-keyset" 
     (describe-keyset (+ (read-msg "ns") ".reporter2-keyset")) (h.precision 10))
-  (tellorflex.deposit-stake "reporter3-keyset" 
+  (deposit-stake "reporter3-keyset" 
     (describe-keyset (+ (read-msg "ns") ".reporter3-keyset")) (h.precision 10))
-  (tellorflex.request-staking-withdraw "reporter-1" (h.precision 10))
-  (tellorflex.submit-value 
+  (request-staking-withdraw "reporter-1" (h.precision 10))
+  (submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
-  (expect "Tellorflex balance should be 30.0" 30.0 (f-TRB.get-balance "tellorflex"))
+  (expect "Tellorflex balance should be 30.0" 30.0 (f-TRB.get-balance FLEX_ACCOUNT))
   (test-capability (governance-mock.PRIVATE))
-  (tellorflex.remove-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (h.blockTime))
-  (tellorflex.slash-reporter "reporter-1" "reporter2-keyset")
+  (remove-value (hash (base64-encode "{SpotPrice: [eth,usd]}")) (h.blockTime))
+  (slash-reporter "reporter-1" "reporter2-keyset")
   (commit-tx)
   (begin-tx)
   (namespace (read-msg "ns"))
+  (use tellorflex)
   ; advance time 1 day
   (env-chain-data { "block-time": (h.advanceTime 86400)})
   (tellorflex.submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter3-keyset")
-  (expect "Tellorflex balance should be 20" 20.0 (f-TRB.get-balance "tellorflex"))
+  (expect "Tellorflex balance should be 20" 20.0 (f-TRB.get-balance FLEX_ACCOUNT))
 
-  (test-capability (free.tellorflex.PRIVATE))
-  (f-TRB.mint "tellorflex" (tellorflex.create-flex-guard) 10.0)
-  (expect "Tellorflex balance should be 30" 30.0 (f-TRB.get-balance "tellorflex"))
+  (f-TRB.mint FLEX_ACCOUNT (flex-guard) 10.0)
+  (expect "Tellorflex balance should be 30" 30.0 (f-TRB.get-balance FLEX_ACCOUNT))
   ; advance time 1 day
   (env-chain-data {'block-time: (h.advanceTime 86400)})
   (tellorflex.submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter3-keyset")
-  (expect-that "Tellorflex balance should be less than 30.0" ( > 30.0) (f-TRB.get-balance "tellorflex"))
+  (expect-that "Tellorflex balance should be less than 30.0" ( > 30.0) (f-TRB.get-balance FLEX_ACCOUNT))
   (commit-tx)

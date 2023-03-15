@@ -5,37 +5,37 @@
   (print "TBR should not be removed when depositStake w/ lockedBalance")
   (begin-tx)
   (namespace (read-msg "ns"))
+  (use tellorflex)
   ;  Deposit 2 stakes
-  (tellorflex.deposit-stake "reporter-1" (describe-keyset "free.reporter-1") (h.precision 10))
-  (tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (h.precision 10))
+  (deposit-stake "reporter-1" (describe-keyset "free.reporter-1") (h.precision 10))
+  (deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (h.precision 10))
   ;  Resquest withdrawal 1 stake which locks it for 7 days
-  (tellorflex.request-staking-withdraw "reporter-1" (h.precision 10))
+  (request-staking-withdraw "reporter-1" (h.precision 10))
   ;  Should still be able to submit value since one stake still available
-  (tellorflex.submit-value 
+  (submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
   ;  Tellorflex balance should still be 20 after request
-  (expect "Tellorflex balance should be 20 after deposits" 20.0 (f-TRB.get-balance "tellorflex"))
+  (expect "Tellorflex balance should be 20 after deposits" 20.0 (f-TRB.get-balance FLEX_ACCOUNT))
   ;  Mint tokens to tellorflex
-  (test-capability (tellorflex.PRIVATE))
-  (f-TRB.mint "tellorflex" (tellorflex.create-flex-guard) 10.0)
+  (f-TRB.mint FLEX_ACCOUNT (flex-guard) 10.0)
   ;  To withdraw amount should be the amount thats requested for withdrawal
-  (expect "to-withdraw amount should be 10" (h.precision 10) (tellorflex.to-withdraw))
+  (expect "to-withdraw amount should be 10" (h.precision 10) (to-withdraw))
   ;  Deposit stake with reporter that requested withdrawal 
   ;  Note doesn't reduce token balance of reporter just moves from locked to staked
-  (tellorflex.deposit-stake "reporter-1" 
+  (deposit-stake "reporter-1" 
     (describe-keyset "free.reporter-1") (h.precision 10))
   ; advance time 1 day
   (env-chain-data {'block-time: (h.advanceTime 86400)})
   ;  to withdraw amount 0 since not locked anymore
   (expect "to-withdraw amount should be go down" 0 (tellorflex.to-withdraw))
-  (expect "Tellorflex balance should be 30.0" 30.0 (f-TRB.get-balance "tellorflex"))
+  (expect "Tellorflex balance should be 30.0" 30.0 (f-TRB.get-balance FLEX_ACCOUNT))
 
-  (tellorflex.submit-value 
+  (submit-value 
     (hash (base64-encode "{SpotPrice: [eth,usd]}")) (base64-encode "100") 0 
     (base64-encode "{SpotPrice: [eth,usd]}")  "reporter2-keyset")
   ;  tokens in Tellorflex not from staking are dispersed to reporters
-  (expect-that "Balance should be less than 30.0" (> 30.0 ) (f-TRB.get-balance "tellorflex"))
+  (expect-that "Balance should be less than 30.0" (> 30.0 ) (f-TRB.get-balance FLEX_ACCOUNT))
   (rollback-tx)
 ;  **************************************************************************************************
   (print "***************************************************************************************")

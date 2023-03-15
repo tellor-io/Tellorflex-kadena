@@ -1,121 +1,121 @@
 (load "../tellorflex-setup.repl")
 
-(env-sigs [])
-(env-data {})
-(env-chain-data {})
-(print "Realistic test with multiple stakers")
+(namespace (read-msg "ns"))
+(use tellorflex) (use f-TRB)
 (env-data
   { "ns": "free"
   , "admin-keyset": { "keys": [ "admin-public-key" ]}
   , "user-keyset": { "keys": [ "user-public-key" ], "pred": "keys-all" }
-  , "reporter1": { "keys": [ ], "pred": "keys-all" }
-  , "reporter2": { "keys": [ ], "pred": "keys-all" }
-  , "reporter3": { "keys": [], "pred": "keys-all" }
-  , "reporter4": { "keys": [], "pred": "keys-all" }
-  , "reporter5": { "keys": [], "pred": "keys-all" }
-  , "reporter6": { "keys": [], "pred": "keys-all" }
-  , "reporter7": { "keys": [], "pred": "keys-all" }
-  , "reporter8": { "keys": [], "pred": "keys-all" }
-  , "reporter9": { "keys": [], "pred": "keys-all" }
-  , "reporter10": { "keys": [], "pred": "keys-all" }
-  , "reporter11": { "keys": [], "pred": "keys-all" }
-  , "reporter12": { "keys": [], "pred": "keys-all" }
-  , "reporter13": { "keys": [], "pred": "keys-all" }
-  , "reporter14": { "keys": [], "pred": "keys-all" }
-  , "reporter15": { "keys": [], "pred": "keys-all" }
-  , "reporter16": { "keys": [], "pred": "keys-all" }
-  , "reporter17": { "keys": [], "pred": "keys-all" }
-  , "reporter18": { "keys": [], "pred": "keys-all" }
-  , "reporter19": { "keys": [], "pred": "keys-all" }
-  , "reporter20": { "keys": [], "pred": "keys-all" }
+  , "reporter1": { "keys": [] }, "reporter2": { "keys": [] }, "reporter3": { "keys": [] }
+  , "reporter4": { "keys": [] }, "reporter5": { "keys": [] }, "reporter6": { "keys": [] }
+  , "reporter7": { "keys": [] }, "reporter8": { "keys": [] }, "reporter9": { "keys": [] }
+  , "reporter10": { "keys": [] }, "reporter11": { "keys": [] }, "reporter12": { "keys": [] }
+  , "reporter13": { "keys": [] }, "reporter14": { "keys": [] }, "reporter15": { "keys": [] }
+  , "reporter16": { "keys": [] }, "reporter17": { "keys": [] }, "reporter18": { "keys": [] }
+  , "reporter19": { "keys": [] }, "reporter20": { "keys": [] }
   })
 (env-sigs [
-  {"key": "admin-public-key", "caps": []},
-  {"key": "user-public-key", "caps": []},
-  {"key": "user-keyset", "caps": [(free.f-TRB.TRANSFER "user-keyset" "tellorflex" 1000.0)]}
-  ,{"key": "reporter1", "caps": [(free.f-TRB.TRANSFER "reporter1" "tellorflex" 100.0)]}
-  ,{"key": "reporter2", "caps": [(free.f-TRB.TRANSFER "reporter2" "tellorflex" 100.0)]}
-  ,{"key": "reporter3", "caps": [(free.f-TRB.TRANSFER "reporter3" "tellorflex" 100.0)]}
-  ,{"key": "reporter4", "caps": [(free.f-TRB.TRANSFER "reporter4" "tellorflex" 100.0)]}
-  ,{"key": "reporter5", "caps": [(free.f-TRB.TRANSFER "reporter5" "tellorflex" 100.0)]}
-  ,{"key": "reporter6", "caps": [(free.f-TRB.TRANSFER "reporter6" "tellorflex" 100.0)]}
-  ,{"key": "reporter7", "caps": [(free.f-TRB.TRANSFER "reporter7" "tellorflex" 100.0)]}
-  ,{"key": "reporter8", "caps": [(free.f-TRB.TRANSFER "reporter8" "tellorflex" 100.0)]}
-  ,{"key": "reporter9", "caps": [(free.f-TRB.TRANSFER "reporter9" "tellorflex" 100.0)]}
-  ,{"key": "reporter10", "caps": [(free.f-TRB.TRANSFER "reporter10" "tellorflex" 100.0)]}
-  ,{"key": "reporter11", "caps": [(free.f-TRB.TRANSFER "reporter11" "tellorflex" 100.0)]}
-  ,{"key": "reporter12", "caps": [(free.f-TRB.TRANSFER "reporter12" "tellorflex" 100.0)]}
-  ,{"key": "reporter13", "caps": [(free.f-TRB.TRANSFER "reporter13" "tellorflex" 100.0)]}
-  ,{"key": "reporter14", "caps": [(free.f-TRB.TRANSFER "reporter14" "tellorflex" 100.0)]}
-  ,{"key": "reporter15", "caps": [(free.f-TRB.TRANSFER "reporter15" "tellorflex" 100.0)]}
-  ,{"key": "reporter16", "caps": [(free.f-TRB.TRANSFER "reporter16" "tellorflex" 100.0)]}
-  ,{"key": "reporter17", "caps": [(free.f-TRB.TRANSFER "reporter17" "tellorflex" 100.0)]}
-  ,{"key": "reporter18", "caps": [(free.f-TRB.TRANSFER "reporter18" "tellorflex" 100.0)]}
-  ,{"key": "reporter19", "caps": [(free.f-TRB.TRANSFER "reporter19" "tellorflex" 100.0)]}
-  ,{"key": "reporter20", "caps": [(free.f-TRB.TRANSFER "reporter20" "tellorflex" 100.0)]}
-  ])
-(free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1000))
-(let ((func (lambda (a b)
+  {"key": "admin-public-key", "caps": []},{"key": "user-public-key", "caps": []}
+  ,{"key": "user-keyset", "caps": [(TRANSFER "user-keyset" FLEX_ACCOUNT 1000.0)]}
+  ,{"key": "reporter1", "caps": [(TRANSFER "reporter1" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter2", "caps": [(TRANSFER "reporter2" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter3", "caps": [(TRANSFER "reporter3" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter4", "caps": [(TRANSFER "reporter4" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter5", "caps": [(TRANSFER "reporter5" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter6", "caps": [(TRANSFER "reporter6" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter7", "caps": [(TRANSFER "reporter7" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter8", "caps": [(TRANSFER "reporter8" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter9", "caps": [(TRANSFER "reporter9" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter10", "caps": [(TRANSFER "reporter10" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter11", "caps": [(TRANSFER "reporter11" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter12", "caps": [(TRANSFER "reporter12" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter13", "caps": [(TRANSFER "reporter13" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter14", "caps": [(TRANSFER "reporter14" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter15", "caps": [(TRANSFER "reporter15" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter16", "caps": [(TRANSFER "reporter16" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter17", "caps": [(TRANSFER "reporter17" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter18", "caps": [(TRANSFER "reporter18" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter19", "caps": [(TRANSFER "reporter19" FLEX_ACCOUNT 100.0)]}
+  ,{"key": "reporter20", "caps": [(TRANSFER "reporter20" FLEX_ACCOUNT 100.0)]} ])
+(print "***************************************************************************************")
+(print "Realistic test with multiple stakers")
+
+(add-staking-rewards "user-keyset" (h.precision 1000))
+(let ((func (lambda (_ staker-num)
   (begin-tx)
-  (namespace "free")
-  (define-keyset (+ "free.reporter" (int-to-str 10 b)) (read-keyset (+ "reporter" (int-to-str 10 b))))
+  (f-TRB.create-account 
+    (+ "reporter" (int-to-str 10 staker-num))
+    (read-keyset (+ "reporter" (int-to-str 10 staker-num))))
+  (f-TRB.mint
+    (+ "reporter" (int-to-str 10 staker-num))
+    (read-keyset (+ "reporter" (int-to-str 10 staker-num))) 1000.0)
   (commit-tx)
   (begin-tx)
-  (free.f-TRB.create-account (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))))
-  (free.f-TRB.mint (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 1000.0)
+  (deposit-stake 
+    (+ "reporter" (int-to-str 10 staker-num))
+    (read-keyset (+ "reporter" (int-to-str 10 staker-num)))
+    (h.precision 100))
+  (commit-tx)
+  ) ))
+  (fold (func) 0 (enumerate 1 20)) )
+
+(namespace (read-msg "ns"))
+(use tellorflex)
+(env-chain-data {'block-time: (h.advanceTime (* 84600 10))})
+(let ((func (lambda (_ staker-num)
+  (add-staking-rewards "user-keyset" (h.precision 1))
+  (begin-tx)
+  (f-TRB.mint 
+    (+ "reporter" (int-to-str 10 staker-num)) 
+    (read-keyset (+ "reporter" (int-to-str 10 staker-num))) 100.0)
   (commit-tx)
   (begin-tx)
-  (free.tellorflex.deposit-stake (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) (* 100 (^ 10 12)))
+  (deposit-stake 
+    (+ "reporter" (int-to-str 10 staker-num))
+    (read-keyset (+ "reporter" (int-to-str 10 staker-num)))
+    (h.precision 100))
   (commit-tx)
   ) ))
   (fold (func) 0 (enumerate 1 20))
 
 )
-
-(env-chain-data {'block-time: (free.h.advanceTime (* 84600 10))})
-(let ((func (lambda (a b)
-  (free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1))
+(namespace (read-msg "ns"))
+(use tellorflex)
+(env-chain-data {'block-time: (h.advanceTime (* 84600 80))})
+(let ((func (lambda (_ staker-num)
+  (add-staking-rewards "user-keyset" (h.precision 1))
   (begin-tx)
-  (free.f-TRB.mint (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 100.0)
+  (f-TRB.mint 
+    (+ "reporter" (int-to-str 10 staker-num))
+    (read-keyset (+ "reporter" (int-to-str 10 staker-num))) 100.0)
   (commit-tx)
   (begin-tx)
-  (free.tellorflex.deposit-stake (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) (* 100 (^ 10 12)))
-  (commit-tx)
-  ) ))
-  (fold (func) 0 (enumerate 1 20))
-
-)
-
-(env-chain-data {'block-time: (free.h.advanceTime (* 84600 80))})
-(let ((func (lambda (a b)
-  (free.tellorflex.add-staking-rewards "user-keyset" (free.h.precision 1))
-  (begin-tx)
-  (free.f-TRB.mint (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) 100.0)
-  (commit-tx)
-  (begin-tx)
-  (free.tellorflex.deposit-stake (+ "reporter" (int-to-str 10 b)) (describe-keyset (+ "free.reporter" (int-to-str 10 b))) (* 100 (^ 10 12)))
+  (deposit-stake 
+    (+ "reporter" (int-to-str 10 staker-num))
+    (read-keyset (+ "reporter" (int-to-str 10 staker-num))) 
+    (h.precision 100))
   (commit-tx)
   ) ))
-  (fold (func) 0 (enumerate 1 20))
+  (fold (func) 0 (enumerate 1 20)) )
 
-)
-
-(env-chain-data {'block-time: (free.h.advanceTime (* 84600 80))})
-(let ((func (lambda (a b)
-  (let* ((staker-info (free.tellorflex.get-staker-info (+ "reporter" (int-to-str 10 b)) ))
+(namespace (read-msg "ns"))
+(use tellorflex)
+(env-chain-data {'block-time: (h.advanceTime (* 84600 80))})
+;  request withdrawal for all 20 stakers
+(let ((func (lambda (_ staker-num)
+  (let* ((staker-info (get-staker-info (+ "reporter" (int-to-str 10 staker-num)) ))
          (stake-balance (at 'staked-balance staker-info)))
         (begin-tx)
-        (free.tellorflex.request-staking-withdraw (+ "reporter" (int-to-str 10 b)) stake-balance)
-        (commit-tx))
-  ) ))
-  (fold (func) 0 (enumerate 1 20))
-
-)
-
-(env-chain-data {'block-time: (free.h.advanceTime (* 84600 88))})
-(let ((func (lambda (a b)
+        (request-staking-withdraw (+ "reporter" (int-to-str 10 staker-num)) stake-balance)
+        (commit-tx) ) ) ) )
+  (fold (func) 0 (enumerate 1 20)) )
+;  withdraw all 20 stakers
+(namespace (read-msg "ns"))
+(use tellorflex)
+(env-chain-data {'block-time: (h.advanceTime (* 84600 88))})
+(let ((func (lambda (_ staker-num)
   (begin-tx)
-  (free.tellorflex.withdraw-stake (+ "reporter" (int-to-str 10 b)) )
+  (withdraw-stake (+ "reporter" (int-to-str 10 staker-num)) )
   (commit-tx)
   ) ))
   (fold (func) 0 (enumerate 1 20))

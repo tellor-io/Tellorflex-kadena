@@ -40,11 +40,8 @@
       @event true
   )
 ; ***************************GUARD*********************************************
-  (defun private-user-cap:bool () 
-    (require-capability (PRIVATE)) 
-  )
-  (defun create-gov-guard:guard () 
-    (create-user-guard (private-user-cap))
+  (defun gov-guard:guard ()
+    (create-capability-guard (PRIVATE))
   )
 ; ***************************SCHEMA********************************************
   (defschema dispute-ids-by-reporter-schema
@@ -95,25 +92,22 @@
 ; ***************************CONSTANTS*****************************************
   (defconst TWELVE_HOURS:integer 43200)
   (defconst ONE_DAY:integer 86400)
+  (defconst GOV_ACCOUNT (create-principal (gov-guard)))
 ; ***************************MAIN-FUNCTIONS************************************
-  (defun constructor:string (
-    team-multisig:string
-    gov-account-name:string)
-    (insert global "global-vars"
-      { "team-multisig": team-multisig
-      , "gov-account-name": gov-account-name
-      , "vote-count": 0 })
+  (defun constructor:string (team-multisig:string gov-account-name:string)
+    (with-capability (TELLOR)
+      (insert global "global-vars"
+        { "team-multisig": team-multisig, "gov-account-name": GOV_ACCOUNT, "vote-count": 0 })
 
-    (f-TRB.create-account gov-account-name (create-gov-guard))
-    "Global variables set!"
+      (f-TRB.create-account GOV_ACCOUNT (gov-guard))
+
+      "Global variables set!"
+    )
   )
 
-  (defun register-gov-guard:string ()
+  (defun register-gov-guard:guard ()
     @doc "Registers the gov guard with the oracle"
-      (with-capability (TELLOR)
-        (tellorflex.init-gov-guard (create-gov-guard))
-      )
-    "Gov guard registered"
+      (with-capability (TELLOR) (gov-guard))
   )
 
   (defun begin-dispute:bool 

@@ -5,9 +5,6 @@
   (print "Realistic test with staking rewards and disputes")
   (begin-tx)
   (namespace (read-msg "ns"))
-
-  (test-capability (tellorflex.PRIVATE))
-  (f-TRB.mint "tellorflex" (tellorflex.create-flex-guard) 1000.0)
   ; check initial conditions
   (expect "stakingRewardsBalance 0" 0 (tellorflex.staking-rewards-balance))
   (expect "rewardRate 0" 0 (tellorflex.reward-rate))

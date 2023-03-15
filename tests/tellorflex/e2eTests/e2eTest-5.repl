@@ -107,8 +107,8 @@
   (print "TBR, stakes, and staking rewards can't borrow from each other")
   (begin-tx)
   (namespace (read-msg "ns"))
-  (test-capability (tellorflex.PRIVATE))
-  (f-TRB.mint "tellorflex" (tellorflex.create-flex-guard) 100.0)
+  (use tellorflex)
+  (f-TRB.mint FLEX_ACCOUNT (flex-guard) 100.0)
   (tellorflex.deposit-stake "reporter2-keyset" 
     (describe-keyset "free.reporter2-keyset") (h.precision 10))
   (tellorflex.add-staking-rewards "reporter2-keyset" (h.precision 100))
@@ -122,6 +122,7 @@
   (commit-tx)
   (begin-tx)
   (namespace (read-msg "ns"))
+  (use tellorflex)
   ; advance time 16 hour 40minutes = 60000 seconds
   (env-chain-data {'block-time: (h.advanceTime 60000)})
   (tellorflex.submit-value 
@@ -130,8 +131,7 @@
   (expect "stakingRewardsBalance should be 100" (h.precision 100) (tellorflex.staking-rewards-balance))
   (expect "totalStakeAmount should be 10" (h.precision 10) (tellorflex.total-stake-amount))
   
-  (test-capability (tellorflex.PRIVATE))
-  (f-TRB.mint "tellorflex" (tellorflex.create-flex-guard) 100.0)
+  (f-TRB.mint FLEX_ACCOUNT (flex-guard) 100.0)
   ; advance time 30 days
   (env-chain-data {'block-time: (h.advanceTime 2712000)})
   (tellorflex.deposit-stake "reporter2-keyset" (describe-keyset "free.reporter2-keyset") (* 5 (^ 10 17)))

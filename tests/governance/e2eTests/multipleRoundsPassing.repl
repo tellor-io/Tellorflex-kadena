@@ -1,6 +1,6 @@
 (load "../governance-setup.repl")
 (namespace (read-msg "ns"))
-(use f-TRB)
+(use f-TRB) (use governance) (use tellorflex)
 (env-data {
   "ns": "free",
   "admin-keyset": { "keys": [ "admin-public-key" ], "pred": "keys-all"},
@@ -9,10 +9,10 @@
   "account4": { "keys": [] },
   "account2": { "keys": [] } })
 (env-sigs [
-  {"key": "account1", "caps": [(TRANSFER "account1" "account2" 100.0), (TRANSFER "account1" "tellorflex" 10.0)]},
-  {"key": "account2", "caps": [(TRANSFER "account2" "governance" 10.0)]},
-  {"key": "account3", "caps": [(TRANSFER "account3" "governance" 10.0)]},
-  {"key": "account4", "caps": [(TRANSFER "account4" "governance" 10.0)]},
+  {"key": "account1", "caps": [(TRANSFER "account1" "account2" 100.0), (TRANSFER "account1" FLEX_ACCOUNT 10.0)]},
+  {"key": "account2", "caps": [(TRANSFER "account2" GOV_ACCOUNT 10.0)]},
+  {"key": "account3", "caps": [(TRANSFER "account3" GOV_ACCOUNT 10.0)]},
+  {"key": "account4", "caps": [(TRANSFER "account4" GOV_ACCOUNT 10.0)]},
   {"key": "admin-public-key", "caps": []}])
   (begin-tx)
   (namespace (read-msg "ns"))
@@ -89,7 +89,7 @@
         (disputer1-bal (get-balance "account2"))
         (disputer2-bal (get-balance "account3"))
         (disputer3-bal (get-balance "account4"))
-        (balance-gov (get-balance "governance")))
+        (balance-gov (get-balance GOV_ACCOUNT)))
 
     (expect-failure "Must be the final vote" (execute-vote 1))
     (expect-failure "Must be the final vote" (execute-vote 2))
@@ -99,6 +99,6 @@
     (expect "" (+ 11.0 disputer1-bal) (get-balance "account2"))
     (expect "" (+ 2.0 disputer2-bal) (get-balance "account3"))
     (expect "" (+ 2.0 disputer2-bal) (get-balance "account4"))
-    (expect "" (- balance-gov 17.0) (get-balance "governance"))
+    (expect "" (- balance-gov 17.0) (get-balance GOV_ACCOUNT))
     (expect "passed" "PASSED" (at 'result (get-vote-info 3))))
   (commit-tx)

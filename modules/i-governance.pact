@@ -5,6 +5,6 @@
   )
   (defun get-vote-tally-by-address:integer (voter:string)
   )
-  (defun register-gov-guard:string () )
+  (defun register-gov-guard:guard () )
 
   )

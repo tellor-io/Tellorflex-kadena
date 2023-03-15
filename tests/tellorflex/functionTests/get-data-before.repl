@@ -6,19 +6,19 @@
 (namespace (read-msg "ns"))
 (tellorflex.deposit-stake
     "reporter-1"
-    (describe-keyset "free.reporter-1")
+    (read-keyset "reporter-1")
     (h.precision 100))
 (tellorflex.deposit-stake
     "reporter2-keyset"
-    (describe-keyset "free.reporter2-keyset")
+    (read-keyset "reporter2-keyset")
     (h.precision 100))
 (tellorflex.deposit-stake
     "reporter3-keyset"
-    (describe-keyset "free.reporter3-keyset")
+    (read-keyset "reporter3-keyset")
     (h.precision 100))
 (tellorflex.deposit-stake
     "reporter4-keyset"
-    (describe-keyset "free.reporter4-keyset")
+    (read-keyset "reporter4-keyset")
     (h.precision 100))
 ;  submit value
 (tellorflex.submit-value

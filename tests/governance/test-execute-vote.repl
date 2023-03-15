@@ -97,7 +97,7 @@
     (env-chain-data {"block-time": (advanceTime (* 2 86400))})
     (tally-votes 3)
     (expect-failure "1 day has to pass after tally to allow for disputes" (execute-vote 3))
-    (f-TRB.get-balance "governance")
+    (f-TRB.get-balance GOV_ACCOUNT)
     ;  advance a day
     (env-chain-data {"block-time": (advanceTime 86400)})
     (execute-vote 3)

@@ -18,11 +18,6 @@
     \  > (free.tellorflex.submit-value ...)                                    \
     \allows users to read values                                               \
     \  > (free.tellorflex.retrieve-value ...)"
-
-  @model
-    [ (defproperty owner-authorized (authorized-by (+ (read-msg "ns")".admin-keyset")))
-    ]
-
 ; ***************************CAPABILITIES**************************************
   (defcap TELLOR ()
     @doc "Enforce only owner."
@@ -34,7 +29,7 @@
     (compose-capability (PRIVATE)) 
   )
   (defcap GOV_GUARD ()
-    (enforce-guard (at "guard" (read gov-guard "gov-guard")))
+    (enforce-guard (at "guard" (read governance-table "governance")))
     (compose-capability (PRIVATE)) 
   )
 ; ***************************EVENT-CAPS****************************************
@@ -81,9 +76,9 @@
   (defconst PRECISION (^ 10 18))
   (defconst SEVEN_DAYS 604800)
   (defconst THIRTY_DAYS 2592000)
+  (defconst FLEX_ACCOUNT (create-principal (flex-guard)))
 ; ***************************TABLE-SCHEMA**************************************
   (defschema constructor-schema
-    tellorflex-account:string
     accumulated-reward-per-share:integer
     minimum-stake-amount:integer
     reporting-lock:integer
@@ -123,8 +118,7 @@
   (defschema timestamps-schema
     timestamps:[object{timestamp-dispute-object}])
   (defschema governance-schema
-    governance:module{i-governance})
-  (defschema gov-guard-schema
+    governance:module{i-governance}
     guard:guard)
 ; ***************************OBJECT-SCHEMA*************************************
   (defschema timestamp-dispute-object
@@ -148,14 +142,9 @@
   (deftable timestamps:{timestamps-schema})
   (deftable global-variables:{constructor-schema})
   (deftable governance-table:{governance-schema})
-  (deftable gov-guard:{gov-guard-schema}) 
 ; ***************************GUARDS********************************************
-  (defun private-user-cap:bool () (require-capability (PRIVATE)) )
-  (defun create-flex-guard:guard () (create-user-guard (private-user-cap)) )
+  (defun flex-guard:guard () (create-capability-guard (PRIVATE)))
 ; ***************************Global-GETTERS************************************
-  (defun tellorflex-account:string ()
-    (at "tellorflex-account" (read global-variables "global-vars"))
-  )
   (defun get-governance-module:module{i-governance} ()
     (at "governance" (read governance-table "governance"))
   )
@@ -206,7 +195,6 @@
   )
 ; ***************************MAIN-FUNCTIONS************************************
   (defun constructor:string (
-    tellorflex-account:string
     reporting-lock:integer
     stake-amount-dollar-target:integer
     staking-token-price:integer
@@ -218,8 +206,7 @@
     (with-capability (TELLOR)
       (let ((potential-amount (/ stake-amount-dollar-target staking-token-price)))
         (insert global-variables 'global-vars
-          { 'tellorflex-account: tellorflex-account
-          , 'accumulated-reward-per-share: 0
+          { 'accumulated-reward-per-share: 0
           , 'minimum-stake-amount: minimum-stake-amount
           , 'reporting-lock: reporting-lock
           , 'reward-rate: 0
@@ -239,22 +226,16 @@
         )
       )
 
-      (f-TRB.create-account tellorflex-account (create-flex-guard))
+      (f-TRB.create-account FLEX_ACCOUNT (flex-guard))
       "Global variables set!"
     )
-  )
-  (defun init-gov-guard:string (guard:guard)
-    ; fails if governance hasn't been initialized
-    (get-governance-module)
-    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
-    (insert gov-guard 'gov-guard {'guard: guard})
-    "Gov guard registered"
   )
   (defun init (governance:module{i-governance})
     @doc "Allows the owner to initialize the governance (flex addy needed for governance deployment)"
     (with-capability (TELLOR)
-      (insert governance-table 'governance { 'governance: governance })
-      (governance::register-gov-guard))
+      (insert governance-table 'governance 
+      { 'governance: governance, 'guard: (governance::register-gov-guard)})
+    )
   )
   (defun add-staking-rewards (account:string amount:integer)
     @doc "Funds the flex contract with staking rewards (autopay and miniting) anyone can add at will"
@@ -562,7 +543,6 @@
       (emit-event (StakeWithdrawn staker))
     )
   )
-
 ; ***************************GETTERS*******************************************
   (defun get-block-number-by-timestamp:integer (query-id:string timestamp:integer)
     @doc "Returns the block number at a given timestamp"
@@ -670,7 +650,7 @@
       , 'to-withdraw := to-withdraw
       }
       (-
-        (precision (f-TRB.get-balance (tellorflex-account)))
+        (precision (f-TRB.get-balance FLEX_ACCOUNT))
         (fold (+) to-withdraw [total-stake-amount staking-rewards-balance])
       )  
     )
@@ -685,9 +665,9 @@
   (defun transfers-from-flex (amount:integer to:string)
     (require-capability (PRIVATE))
     (if (> amount 0)
-        (let ((flex (tellorflex-account)))
-          (install-capability (f-TRB.TRANSFER flex to (to-decimal amount)))
-          (f-TRB.transfer flex to (to-decimal amount))
+        (let ((from FLEX_ACCOUNT))
+          (install-capability (f-TRB.TRANSFER from to (to-decimal amount)))
+          (f-TRB.transfer from to (to-decimal amount))
         )
         "nothing to transfer"
     )
@@ -695,7 +675,7 @@
   (defun transfers-to-flex (amount:integer from:string)
     (require-capability (PRIVATE))
     (if (> amount 0)
-        (f-TRB.transfer from (tellorflex-account) (to-decimal amount))
+        (f-TRB.transfer from FLEX_ACCOUNT (to-decimal amount))
         "nothing to transfer"
     )
   )
@@ -868,7 +848,7 @@
 
       (let* ((reward (/ (*
               (- block-time time-of-last-new-value) time-based-reward) 300))
-             (contract-balance (f-TRB.get-balance (tellorflex-account)))
+             (contract-balance (f-TRB.get-balance FLEX_ACCOUNT))
              (total-time-based-rewards-balance
               (- (precision contract-balance)
                 (fold (+) total-stake-amount
@@ -1025,13 +1005,11 @@
     [
       (create-table global-variables)
       (create-table governance-table)
-      (create-table gov-guard)
       (create-table reports)
       (create-table reports-submitted-count)
       (create-table staker-details)
       (create-table timestamps)
-      (constructor 
-        "tellorflex"
+      (constructor
         43200
         (* 500 PRECISION)
         (round (* (read-decimal "token-price") PRECISION))
