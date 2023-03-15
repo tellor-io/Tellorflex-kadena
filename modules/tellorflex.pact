@@ -92,7 +92,6 @@
     reward-rate:integer
     staking-rewards-balance:integer
     staking-token-price-query-id:string
-    time-based-reward:integer
     time-of-last-allocation:integer
     time-of-last-new-value:integer
     total-reward-debt:integer
@@ -229,7 +228,6 @@
           , 'stake-amount-dollar-target: stake-amount-dollar-target
           , 'staking-rewards-balance: 0
           , 'staking-token-price-query-id: staking-token-price-query-id
-          , 'time-based-reward: TIME_BASED_REWARD
           , 'time-of-last-allocation: 0
           , 'time-of-last-new-value: (block-time-in-seconds)
           , 'total-reward-debt: 0
@@ -863,11 +861,10 @@
       { 'total-stake-amount := total-stake-amount
       , 'staking-rewards-balance := staking-rewards-balance
       , 'to-withdraw := to-withdraw
-      , 'time-of-last-new-value := time-of-last-new-value
-      , 'time-based-reward := time-based-reward }
+      , 'time-of-last-new-value := time-of-last-new-value }
 
       (let* ((reward (/ (*
-              (- block-time time-of-last-new-value) time-based-reward) 300))
+              (- block-time time-of-last-new-value) TIME_BASED_REWARD) 300))
              (contract-balance (f-TRB.get-balance (tellorflex-account)))
              (total-time-based-rewards-balance
               (- (precision contract-balance)
