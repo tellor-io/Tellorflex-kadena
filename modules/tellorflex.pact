@@ -805,9 +805,9 @@
     )
   )
   (defun update-stake-and-pay-rewards (staker:string new-staked-balance:integer)
-    "Internal function called whenever a user's stake amount changes. First updates staking rewards,
-    transfers pending rewards to user's address, and finally updates user's stake amount
-    and other relevant variables."
+    "Internal function called whenever a user's stake amount changes. First updates staking rewards, \
+    \ transfers pending rewards to user's address, and finally updates user's stake amount  \
+    \ and other relevant variables."
     (require-capability (PRIVATE))
     (update-rewards)
     (with-read staker-details staker
