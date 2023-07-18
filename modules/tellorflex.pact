@@ -287,9 +287,11 @@
   (defun add-staking-rewards (account:string amount:integer)
     @doc "Funds the flex contract with staking rewards (autopay and miniting) anyone can add at will"
     (with-capability (PRIVATE)
+      (enforce (> amount 0) "Amount can't be less than or equal to zero")
       (transfers-to-flex amount account)
       (update-rewards)
-      (update global-variables 'global-vars { 'staking-rewards-balance: amount })
+      (with-read global-variables 'global-vars { 'staking-rewards-balance := bal }
+        (update global-variables 'global-vars { 'staking-rewards-balance: (+ bal amount) }))
       (update global-variables 'global-vars { 'reward-rate: (/ (calculate-reward-rate) THIRTY_DAYS)})
     )
   )
@@ -337,6 +339,8 @@
     guard:guard  ;staker's guard to be stored. To be enforced when submitting values
     amount:integer)  ;amount of tokens staker wishes to stake
     @doc "Allows a reporter to submit stake"
+    ;  assert amount is > 0
+    (enforce (>= amount 0) "Amount can't be less than zero")
     ;  pull governance module from db
     (let ((governance:module{i-governance} (get-governance-module))
           (block-time (block-time-in-seconds)))
@@ -433,6 +437,7 @@
   )
   (defun request-staking-withdraw (staker:string amount:integer)
     @doc "Allows a reporter to request an amount of their stake to withdraw"
+    (enforce (> amount 0) "Amount can't be less than or equal to zero")
     (let ((block-time (block-time-in-seconds))
           (to-withdraw (to-withdraw)))
          (with-capability (STAKER staker)
@@ -768,6 +773,7 @@
   (defun transfers-to-flex (amount:integer from:string)
     "Internal function to transfer tokens from user to tellorflex account"
     (require-capability (PRIVATE))
+    (enforce (>= amount 0) "Amount can't be less than zero")
     (if (> amount 0)
         (f-TRB.transfer from (tellorflex-account) (to-decimal amount))
         "nothing to transfer"
