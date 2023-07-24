@@ -2,9 +2,10 @@
 ; read namespace from deploy msg
 (namespace (read-msg "ns"))
 
-(module governance TELLOR
+(module governance NOT-UPGRADEABLE
   (implements i-governance)
 ; ***************************CAPABILITIES**************************************
+  (defcap NOT-UPGRADEABLE () (enforce false "Enforce non-upgradeability"))
   (defcap TELLOR:bool ()
     (enforce-guard 
       (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
@@ -149,7 +150,7 @@
                             (if (> calc-fee stake-amount) 
                                 stake-amount calc-fee )) )
                     ;  transfer fee to gov account
-                    (f-TRB.transfer account (gov-account) (float fee))
+                    (f-TRB.transfer account (gov-account) (to-decimal fee))
                     ;  insert dispute info into dispute-info table
                     (insert dispute-info (str dispute-id)
                       { "query-id": query-id
@@ -179,7 +180,7 @@
                   (enforce (< (- block-time prev-tally-date) ONE_DAY)
                     "New dispute round must be started within a day")
                   ;  transfer fee to gov account
-                  (f-TRB.transfer account (gov-account) (float fee))
+                  (f-TRB.transfer account (gov-account) (to-decimal fee))
                   ;  insert vote info into vote-info table
                   (insert-vote-info (str dispute-id) 
                     hash vote-round block-time fee account)
@@ -243,7 +244,7 @@
                 (fold (vote-passed) identifier-hash
                 (enumerate 1 (length dispute-ids)))
               (if (= result "INVALID")
-                (let ((reporter-amount (float slashed-amount)))
+                (let ((reporter-amount (to-decimal slashed-amount)))
                   (fold (vote-invalid) identifier-hash
                   (enumerate (length dispute-ids) 1) )
                   ; transfer slashed amount back to disputed reporter
@@ -251,7 +252,7 @@
               (if (= result "FAILED")
                 (let* ( (total-fees (fold (vote-failed) 0 dispute-ids))
                         (transfer-total 
-                          (float (+ slashed-amount total-fees))) )
+                          (to-decimal (+ slashed-amount total-fees))) )
                   (transfer-from-gov disputed-reporter transfer-total))
               "Invalid result value")))
             ;  decrement open disputes count for this query
@@ -465,10 +466,10 @@
       (with-read vote-info (str vote-id)
         { "initiator" := initiator , "fee" := fee }
         (if (= idx 1)
-            (let* ((slashed-amount
+            (let ((slashed-amount
                      (at "slashed-amount" (read dispute-info (str vote-id)))))
-              (transfer-from-gov initiator (float (+ slashed-amount fee))))
-            (transfer-from-gov initiator (float fee))
+              (transfer-from-gov initiator (to-decimal (+ slashed-amount fee))))
+            (transfer-from-gov initiator (to-decimal fee))
         )
       )
     hash
@@ -484,7 +485,7 @@
       (with-read vote-info (str vote-id)
         { "initiator" := initiator , "fee" := fee }
 
-        (transfer-from-gov initiator (float fee))
+        (transfer-from-gov initiator (to-decimal fee))
       )
     )
     hash
@@ -590,7 +591,7 @@
 ; ***************************HELPERS*******************************************
   (defun str (num:integer) (int-to-str 10 num) )
 
-  (defun float:decimal (num:integer) (/ (/ num 1.0) (^ 10 18)) )
+  (defun to-decimal:decimal (num:integer) (/ (/ num 1.0) (^ 10 18)) )
 
   (defun block-time ()
     (str-to-int 10

@@ -1,8 +1,9 @@
-(load "../tellorflex-setup.repl" )
-(begin-tx)
+(load "../../governance/governance-setup.repl" )
 (print "***********************************************")
 (print "Test: Deposit a negative amount")
+(begin-tx)
 (namespace (read-msg "ns"))
+(use tellorflex)
 (tellorflex.deposit-stake
     "reporter-1"
     (describe-keyset "free.reporter-1")
@@ -36,4 +37,30 @@
 (tellorflex.withdraw-stake "reporter2-keyset")
 (expect "Balance of reporter 2 is 1000" 1000.0 (f-TRB.get-balance "reporter2-keyset"))
 (expect "Balance of tellorflex  is 0, the contract has been drained" 100.0 (f-TRB.get-balance "tellorflex"))
-(commit-tx)
+(rollback-tx)
+;  *******************************************************************
+(print "***********************************************")
+(print "Function test: get-data-before failure")
+(begin-tx)
+(namespace (read-msg "ns"))
+(use tellorflex) (use governance)
+(deposit-stake
+        "reporter-1"
+        (describe-keyset (+ (read-msg "ns") ".reporter-1"))
+        (h.precision 10))
+(submit-value
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (base64-encode (h.priceConversion 100.0)) 0
+        (base64-encode "{SpotPrice: [eth,usd]}")  "reporter-1")
+(begin-dispute "reporter2-keyset"
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (h.blockTime))
+(expect "The dispute has begun" true
+        (is-in-dispute
+        (hash (base64-encode "{SpotPrice: [eth,usd]}"))
+        (h.blockTime)))
+(expect "Shouldn't not fail if only value is disputed" 0
+        (at "timestamp"
+        (tellorflex.get-data-before
+        (hash (base64-encode "{SpotPrice: [eth,usd]}")) (+ 1 (h.blockTime)))))
+(rollback-tx)
