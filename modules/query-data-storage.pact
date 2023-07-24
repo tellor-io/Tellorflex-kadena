@@ -1,12 +1,10 @@
 (namespace (read-msg "ns"))
 
-(module queryDataStorage TELLOR
+(module queryDataStorage NOT-UPGRADEABLE
   @doc
   "Storage of query data for mapping query id to corresponding query data"
 
-  (defcap TELLOR ()
-    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
-  )
+  (defcap NOT-UPGRADEABLE () (enforce false "Enforce non-upgradeability"))
 
 ; ***************************Table-Schema**************************************
   (defschema storage-schema
@@ -16,10 +14,8 @@
   (deftable storage:{storage-schema})
 ; ***************************Setter********************************************
   (defun store-data:string (query-data:string)
-      (let ((query-id (hash query-data)))
-          (insert storage query-id{ "query-data": query-data })
-      )
-    )
+    (write storage (hash query-data) { "query-data": query-data })
+  )
 ; ***************************Getter********************************************
   (defun get-query-data:string (query-id:string)
       (at 'query-data (read storage query-id))

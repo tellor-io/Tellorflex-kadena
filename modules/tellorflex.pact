@@ -9,7 +9,7 @@
     ]
   )
 
-(module tellorflex TELLOR
+(module tellorflex NOT-UPGRADEABLE
 
 
   @doc
@@ -19,6 +19,7 @@
     \account or a contract, allowing for a flexible, modular design."
 
 ; ***************************CAPABILITIES**************************************
+  (defcap NOT-UPGRADEABLE () (enforce false "Enforce non-upgradeability"))
   (defcap TELLOR ()
     "Capability to enforce admin only operations"
     (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset"))))
@@ -287,9 +288,11 @@
   (defun add-staking-rewards (account:string amount:integer)
     @doc "Funds the flex contract with staking rewards (autopay and miniting) anyone can add at will"
     (with-capability (PRIVATE)
+      (enforce (> amount 0) "Amount can't be less than or equal to zero")
       (transfers-to-flex amount account)
       (update-rewards)
-      (update global-variables 'global-vars { 'staking-rewards-balance: amount })
+      (with-read global-variables 'global-vars { 'staking-rewards-balance := bal }
+        (update global-variables 'global-vars { 'staking-rewards-balance: (+ bal amount) }))
       (update global-variables 'global-vars { 'reward-rate: (/ (calculate-reward-rate) THIRTY_DAYS)})
     )
   )
@@ -337,6 +340,8 @@
     guard:guard  ;staker's guard to be stored. To be enforced when submitting values
     amount:integer)  ;amount of tokens staker wishes to stake
     @doc "Allows a reporter to submit stake"
+    ;  assert amount is > 0
+    (enforce (>= amount 0) "Amount can't be less than zero")
     ;  pull governance module from db
     (let ((governance:module{i-governance} (get-governance-module))
           (block-time (block-time-in-seconds)))
@@ -433,6 +438,7 @@
   )
   (defun request-staking-withdraw (staker:string amount:integer)
     @doc "Allows a reporter to request an amount of their stake to withdraw"
+    (enforce (> amount 0) "Amount can't be less than or equal to zero")
     (let ((block-time (block-time-in-seconds))
           (to-withdraw (to-withdraw)))
          (with-capability (STAKER staker)
@@ -525,7 +531,7 @@
             { 'timestamps: [] }
             { 'timestamps := timestamps-lis }
             (enforce (or (= nonce (length timestamps-lis)) (= nonce 0))
-              "Nonce must match timestamps list length")
+              "Nonce must match timestamps list length or be zero")
 
            (with-read staker-details staker
              { 'staked-balance := staked-balance
@@ -536,8 +542,8 @@
                "balance must be greater than stake amount")
               ;  forces reporter to abide by reporting lock
              (enforce (>
-               (- block-time reporter-last-timestamp)
-               (/ reporting-lock (/ staked-balance stake-amount)))
+               (* 1000 (- block-time reporter-last-timestamp))
+               (/ (* 1000 reporting-lock) (/ staked-balance stake-amount)))
                "still in reporter time lock, please wait!")
             ;  can't report same timestamp and queryId due to key existing in table
             ;  blocks double reporting of timestamps
@@ -665,7 +671,7 @@
   )
   (defun get-pending-reward-by-staker:integer (staker:string)
     "Returns the pending staking reward for a given address"
-    (with-read staker-details staker
+    (with-capability (PRIVATE) (with-read staker-details staker
       { 'staked-balance := staked-balance
       , 'reward-debt := reward-debt
       , 'start-vote-count := start-vote-count }
@@ -677,11 +683,11 @@
             (vote-count (governance::get-vote-count))
             (number-of-votes (- vote-count start-vote-count))
             (vote-tally (if (> number-of-votes 0) (governance::get-vote-tally-by-address staker) 0)))
-          (/ (* pending-reward (- vote-tally start-vote-count)) number-of-votes)))
+          (if (> number-of-votes 0) (/ (* pending-reward (- vote-tally start-vote-count)) number-of-votes) 0))))
   )
   (defun get-real-staking-rewards-balance:integer ()
     "Returns the real staking rewards balance after accounting for unclaimed rewards"
-    (with-read global-variables 'global-vars
+    (with-capability (PRIVATE) (with-read global-variables 'global-vars
       { 'total-stake-amount := total-stake-amount
       , 'total-reward-debt := total-reward-debt
       , 'staking-rewards-balance := staking-rewards-balance
@@ -693,6 +699,7 @@
           (- PRECISION total-reward-debt)
         )
        )
+      )
     )
   )
   (defun get-report-details (query-id:string timestamp:integer)
@@ -768,6 +775,7 @@
   (defun transfers-to-flex (amount:integer from:string)
     "Internal function to transfer tokens from user to tellorflex account"
     (require-capability (PRIVATE))
+    (enforce (>= amount 0) "Amount can't be less than zero")
     (if (> amount 0)
         (f-TRB.transfer from (tellorflex-account) (to-decimal amount))
         "nothing to transfer"
@@ -871,19 +879,19 @@
       , 'reward-debt := reward-debt
       }
       (if (>= staked-balance (stake-amount))
-          (let ((stakers-total (plus-one (total-stakers))))
-            (if (not staked)
-                (update global-variables 'global-vars { 'total-stakers: stakers-total })
-                "is staked!"
+          (if (not staked)
+            (let ((stakers-total (plus-one (total-stakers))))
+              (update global-variables 'global-vars { 'total-stakers: stakers-total })
+              (update staker-details staker { 'is-staked: true })
             )
-            (update staker-details staker { 'is-staked: true })
+            "is staked!"
           )
-          (let ((stakers-total (- (total-stakers) 1)))
-            (if (and staked (> (total-stakers) 0))
+          (if (and staked (> (total-stakers) 0))
+              (let ((stakers-total (- (total-stakers) 1)))
                 (update global-variables 'global-vars { "total-stakers": stakers-total })
-                "staked but total-stakers <= to zero ?!"
-            )
-            (update staker-details staker {'is-staked: false })
+                (update staker-details staker {'is-staked: false })
+              )
+              "staked but total-stakers <= to zero ?!"
           )
       )
       (update staker-details staker
@@ -920,7 +928,6 @@
                     accumulated-reward-per-share
                     total-stake-amount )
                   (+ accumulated-reward-per-share (/ (* (calculate-reward-rate) PRECISION) total-stake-amount))
-                  (new-accumulated-reward-per-share)
               )
           )
       )
@@ -938,7 +945,7 @@
   (defun block-time-in-seconds:integer ()
     (str-to-int 10 (format-time "%s" (at 'block-time (chain-data))))
   )
-  (defun calculate-time-based-reward:decimal (block-time:integer)
+  (defun calculate-time-based-reward:integer (block-time:integer)
     (require-capability (PRIVATE))
     (with-read global-variables 'global-vars
       { 'total-stake-amount := total-stake-amount
@@ -1026,8 +1033,9 @@
       , "end" := end
       , "disputed" := disputed }
       (if (not disputed) search-obj
-          (let* ((next (- end 1))
-                (next-item (at next reports)))
+          (let* (
+            (next (if (> end 0) (- end 1) end))
+            (next-item (at next reports)))
             { 'found: true
             , 'target: timestamp
             , 'start: 0
@@ -1043,30 +1051,35 @@
   (defun binary-search:object{binary-search-object} (search-obj:object{binary-search-object} _:integer)
     "Internal function binary search for an undisputed report given a timestamp and a query id"
     (require-capability (PRIVATE))
+    ;  create variables for each key in search obj dictionary parameter
     (bind search-obj
-      { "start" := start, "end" := end, "target" := time
-      , "reports" := reports }
-      (let* ((search-obj 
-              (lambda (found timestamp low high target lis is-disputed)
-                { "found": found, "target": timestamp, "start": low
-                , "end": high, "timestamp-before": target, "reports": lis
-                , "disputed": is-disputed }))
-             (found-obj 
-              (lambda (s e m) 
+      { "start" := start, "end" := end, "target" := time, "reports" := reports }
+      (let* (
+        (search-obj (lambda (found timestamp low high target lis is-disputed)
+          { "found": found, "target": timestamp, "start": low, "end": high,
+            "timestamp-before": target, "reports": lis, "disputed": is-disputed }))
+        (found-obj (lambda (s e m) 
                 (search-obj true time s e (at "timestamp" (at m reports)) 
                   reports (at "disputed" (at m reports))))))
 
         (if (>= (at "timestamp" (at start reports)) time)
+        ;  not found cause first timestamp in existing reports is > user input
+        ;  so no before timestamps
             (search-obj false time 0 0 0 reports true)
             (if (< (at "timestamp" (at end reports)) time)
-                (if (not (at "disputed" (at end reports))) 
+            ; check wether user input is > last existing report's timestamp
+            ;  if so no need to look further but still need to check if disputed
+                (if (not (at "disputed" (at end reports)))
+                ;  if not disputed item is found
                     (found-obj start end end)
+                    ;  else linearly search for a non disputed item
+                    ;  but cut the list to search to log2 n+1
                     (fold (search-if-disputed) 
                       (found-obj start end end)
-                      (enumerate 0 (+ 1 (log 2 end))))
+                      (enumerate 0 (log 2 (+ 1 end))))
                 )
-                (let* ((mid (/ (+ start end) 2))
-                        (mid-time (at mid reports)))
+                ;  binary search if list if timestampbefore isn't found
+                (let ((mid (/ (+ start end) 2)))
                   (if (< (at "timestamp" (at mid reports)) time)
                   ;  return the object and add mid + 1 to start
                       (if (>= (at "timestamp" (at (+ 1 mid) reports)) time)
@@ -1075,7 +1088,7 @@
                               (found-obj start end mid)
                               (fold (search-if-disputed) 
                                 (found-obj start mid mid)
-                                (enumerate 0 (+ 1 (log 2 mid))))
+                                (enumerate 0 (+ 1 (log 2 (+ 1 mid)))))
                           )
                           ;  return objec whilst adding mid+1 to start
                           (search-obj false time (+ mid 1) end 0 reports true)
@@ -1087,7 +1100,7 @@
                                 (found-obj start end mid1)
                                 (fold (search-if-disputed) 
                                   (found-obj start mid1 mid1)
-                                  (enumerate 0 (+ 1 (log 2 mid))))
+                                  (enumerate 0 (+ 1 (log 2 (+ 1 mid)))))
                             )
                           )
                           ;  middle -1 to end

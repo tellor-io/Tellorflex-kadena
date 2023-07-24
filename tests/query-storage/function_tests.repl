@@ -1,0 +1,20 @@
+(load "../env-setup.repl")
+(begin-tx)
+(namespace (read-string "ns"))
+(load "../../modules/query-data-storage.pact")
+(env-data 
+    { "ns": "free", "upgrade": true
+    , "admin-keyset": { "keys": [] }, "reporter-1": { "keys": []}
+    , "namespace-keyset": { "keys": [ ], "pred": "keys-all" }
+    , "test-keyset": { "keys": [ ], "pred": "keys-all" } })
+(load "../../modules/query-data-storage.pact")
+;  add same query data multiple times
+(queryDataStorage.store-data (base64-encode "{SpotPrice: [eth,usd]}") )
+(expect "first eth querydata should be correct" (base64-encode "{SpotPrice: [eth,usd]}") (queryDataStorage.get-query-data (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+(queryDataStorage.store-data (base64-encode "{SpotPrice: [eth,usd]}") )
+(expect "second eth querydata should be correct" (base64-encode "{SpotPrice: [eth,usd]}") (queryDataStorage.get-query-data (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+(queryDataStorage.store-data (base64-encode "{SpotPrice: [eth,usd]}") )
+(expect "third eth querydata should be correct" (base64-encode "{SpotPrice: [eth,usd]}") (queryDataStorage.get-query-data (hash (base64-encode "{SpotPrice: [eth,usd]}"))))
+(queryDataStorage.store-data (base64-encode "{SpotPrice: [btc,usd]}") )
+(expect "BTC querydata should be correct" (base64-encode "{SpotPrice: [btc,usd]}") (queryDataStorage.get-query-data (hash (base64-encode "{SpotPrice: [btc,usd]}"))))
+(rollback-tx)

@@ -1,10 +1,8 @@
 (namespace (read-msg "ns"))
 
-(module autopay TELLOR
+(module autopay NOT-UPGRADEABLE
 ; ***************************CAPABILITIES**************************************
-  (defcap TELLOR ()
-    (enforce-guard (keyset-ref-guard (+ (read-msg "ns") ".admin-keyset")))
-  )
+  (defcap NOT-UPGRADEABLE () (enforce false "Enforce non-upgradeability"))
   (defcap PRIVATE ()
     true
   )
