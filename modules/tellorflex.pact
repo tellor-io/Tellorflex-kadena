@@ -340,7 +340,7 @@
     guard:guard  ;staker's guard to be stored. To be enforced when submitting values
     amount:integer)  ;amount of tokens staker wishes to stake
     @doc "Allows a reporter to submit stake"
-    ;  assert amount is > 0
+    ;  assert amount is >= 0
     (enforce (>= amount 0) "Amount can't be less than zero")
     ;  pull governance module from db
     (let ((governance:module{i-governance} (get-governance-module))
