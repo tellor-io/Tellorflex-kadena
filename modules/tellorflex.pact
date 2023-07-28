@@ -886,12 +886,12 @@
             )
             "is staked!"
           )
-          (if (and staked (> (total-stakers) 0))
-              (let ((stakers-total (- (total-stakers) 1)))
+          (let ((stakers-total (- (total-stakers) 1)))
+            (if (and staked (> (total-stakers) 0))
                 (update global-variables 'global-vars { "total-stakers": stakers-total })
-                (update staker-details staker {'is-staked: false })
-              )
-              "staked but total-stakers <= to zero ?!"
+                "staked but total-stakers <= to zero ?!"
+            )
+            (update staker-details staker {'is-staked: false })
           )
       )
       (update staker-details staker
